@@ -103,7 +103,8 @@ let ball, defenders = [], particles = [], popups = [], trail = [];
 let combo = 0, score = 0, best = 0, goals = 0, shots = 0, turns = 0;
 let shake = 0, flash = 0;
 let state = "title";
-let aiming = false, aimPos = null;
+let aiming = false, aimStart = null, aimPos = null;
+const POWER_K = 6.5;
 const bestKey = "flickshoot.best";
 try { best = parseInt(localStorage.getItem(bestKey) || "0", 10) || 0; } catch (e) {}
 
@@ -128,21 +129,21 @@ function dockBall() { ball = { x: DOCK.x, y: DOCK.y, vx: 0, vy: 0, active: false
 
 // ---- 発射 ----
 function aimVec() {
-  if (!aimPos) return null;
-  let dx = DOCK.x - aimPos.x, dy = DOCK.y - aimPos.y;
+  if (!aimPos || !aimStart) return null;
+  // スワイプした向き＝蹴る向き。画面のどこから始めてもOK（最下部の余白に依存しない）
+  let dx = aimPos.x - aimStart.x, dy = aimPos.y - aimStart.y;
   const len = Math.hypot(dx, dy);
-  // パチンコ式: 足元から下に引くと上へ飛ぶ。上方向(vy<0=dy<0)のみ有効
-  if (len < 8 || dy > -6) return null;
-  let sp = Math.min(len * 4.4, MAX_SPEED);
+  if (len < 10 || dy > -6) return null; // 上方向へのスワイプのみ有効
+  let sp = Math.min(len * POWER_K, MAX_SPEED);
   if (sp < MIN_SPEED) sp = MIN_SPEED;
   return { vx: dx / len * sp, vy: dy / len * sp };
 }
 function launch() {
   const v = aimVec();
-  if (!v) { aiming = false; aimPos = null; return; }
+  if (!v) { aiming = false; aimStart = null; aimPos = null; return; }
   ball.vx = v.vx; ball.vy = v.vy; ball.active = true;
   state = "fly"; combo = 0; shots++;
-  aiming = false; aimPos = null;
+  aiming = false; aimStart = null; aimPos = null;
   blip(360, 0.09, "sawtooth", 0.11);
 }
 
@@ -152,7 +153,7 @@ function pointerDown(x, y) {
   if (actx && actx.state === "suspended") actx.resume();
   if (state === "title") { resetGame(); return; }
   if (state === "over") { if (overHit(x, y)) resetGame(); return; }
-  if (state === "aim") { aiming = true; aimPos = { x, y }; }
+  if (state === "aim") { aiming = true; aimStart = { x, y }; aimPos = { x, y }; }
 }
 function pointerMove(x, y) { if (aiming) aimPos = { x, y }; }
 function pointerUp() { if (state === "aim" && aiming) launch(); }
@@ -428,9 +429,9 @@ function drawTitle() {
   ctx.font = "bold 40px system-ui"; ctx.fillText("FLICK", W / 2, H / 2 - 80);
   ctx.fillStyle = "#5ddf8a"; ctx.fillText("SHOOT", W / 2, H / 2 - 36);
   ctx.font = "14px system-ui"; ctx.fillStyle = "#cdeed6";
-  ctx.fillText("ボールを引いて離す = シュート", W / 2, H / 2 + 16);
-  ctx.fillText("DFを突破しキーパーをかわしてGOAL", W / 2, H / 2 + 40);
-  ctx.fillText("外すと敵が前進・赤い線突破で終了", W / 2, H / 2 + 64);
+  ctx.fillText("ゴール方向へスワイプ = シュート", W / 2, H / 2 + 16);
+  ctx.fillText("長く速く払うほど強い・DFは撃ち抜ける", W / 2, H / 2 + 40);
+  ctx.fillText("キーパーをかわしてGOAL／赤線突破で終了", W / 2, H / 2 + 64);
   ctx.fillStyle = "#5ddf8a"; ctx.font = "bold 18px system-ui";
   ctx.fillText("▶ タップでキックオフ", W / 2, H / 2 + 108);
 }
