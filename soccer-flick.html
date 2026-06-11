@@ -130,10 +130,11 @@ function dockBall() { ball = { x: DOCK.x, y: DOCK.y, vx: 0, vy: 0, active: false
 // ---- 発射 ----
 function aimVec() {
   if (!aimPos || !aimStart) return null;
-  // スワイプした向き＝蹴る向き。画面のどこから始めてもOK（最下部の余白に依存しない）
-  let dx = aimPos.x - aimStart.x, dy = aimPos.y - aimStart.y;
+  // パチンコ式: 指でドラッグした「逆向き」に飛ぶ。下へ引っぱれば上へ飛ぶ。
+  // 画面のどこから始めてもOK（最下部の余白に依存しない）。
+  let dx = aimStart.x - aimPos.x, dy = aimStart.y - aimPos.y;
   const len = Math.hypot(dx, dy);
-  if (len < 10 || dy > -6) return null; // 上方向へのスワイプのみ有効
+  if (len < 10 || dy > -6) return null; // 下方向へ引く＝上へ飛ぶ場合のみ有効
   let sp = Math.min(len * POWER_K, MAX_SPEED);
   if (sp < MIN_SPEED) sp = MIN_SPEED;
   return { vx: dx / len * sp, vy: dy / len * sp };
@@ -429,9 +430,9 @@ function drawTitle() {
   ctx.font = "bold 40px system-ui"; ctx.fillText("FLICK", W / 2, H / 2 - 80);
   ctx.fillStyle = "#5ddf8a"; ctx.fillText("SHOOT", W / 2, H / 2 - 36);
   ctx.font = "14px system-ui"; ctx.fillStyle = "#cdeed6";
-  ctx.fillText("ゴール方向へスワイプ = シュート", W / 2, H / 2 + 16);
-  ctx.fillText("長く速く払うほど強い・DFは撃ち抜ける", W / 2, H / 2 + 40);
-  ctx.fillText("キーパーをかわしてGOAL／赤線突破で終了", W / 2, H / 2 + 64);
+  ctx.fillText("下へ引っぱって離す = 上へシュート", W / 2, H / 2 + 16);
+  ctx.fillText("長く引くほど強い・ナナメに引くと逆へ飛ぶ", W / 2, H / 2 + 40);
+  ctx.fillText("DFを撃ち抜きキーパーをかわしてGOAL", W / 2, H / 2 + 64);
   ctx.fillStyle = "#5ddf8a"; ctx.font = "bold 18px system-ui";
   ctx.fillText("▶ タップでキックオフ", W / 2, H / 2 + 108);
 }
