@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>フリックシュート — Flick Shoot</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%; overflow: hidden;
+    background: #04140a;
+    font-family: 'Hiragino Kaku Gothic ProN', system-ui, sans-serif;
+    color: #eafff0;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #wrap {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 0%, #103a1f, #04140a 72%);
+  }
+  canvas {
+    display: block;
+    box-shadow: 0 0 60px rgba(40,200,90,0.22);
+    border-radius: 14px; background: #1f7a3a; touch-action: none;
+  }
+  #mute {
+    position: fixed; top: calc(8px + env(safe-area-inset-top)); right: 10px;
+    z-index: 10; width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
+    color: #eafff0; font-size: 1.1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #mute:active { background: rgba(255,255,255,0.2); }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c"></canvas></div>
+<button id="mute" aria-label="sound">🔊</button>
+<script>
+"use strict";
+/* =======================================================================
+   フリックシュート — Flick Shoot
+   足元のボールを「引いて離す」フリックで蹴り出すサッカー物理アクション。
+   ボールは重力とサイドライン(壁)の反射で飛び、ディフェンダーに当たると
+   突破(=破壊)してコンボが増える。左右に動くキーパーをかわしてゴールに
+   入れると GOAL!! で大量得点。シュートを外すと敵が前進し、最終ラインを
+   破られたらゲームオーバー。最高記録は保存される。
+   ======================================================================= */
+
+const W = 400, H = 640;
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+function layout() {
+  const pad = 12;
+  const availW = window.innerWidth - pad * 2;
+  const availH = window.innerHeight - pad * 2;
+  let cw = availW, ch = cw * H / W;
+  if (ch > availH) { ch = availH; cw = ch * W / H; }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cw + "px";
+  canvas.style.height = ch + "px";
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+}
+window.addEventListener("resize", layout);
+layout();
+
+// ---- サウンド ----
+let actx = null, muted = false;
+function audio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } return actx; }
+function blip(freq, dur, type, vol) {
+  if (muted) return;
+  const a = audio(); if (!a) return;
+  if (a.state === "suspended") a.resume();
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || "square"; o.frequency.value = freq; g.gain.value = 0;
+  o.connect(g); g.connect(a.destination);
+  const t = a.currentTime;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol || 0.12, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.1));
+  o.start(t); o.stop(t + (dur || 0.1) + 0.02);
+}
+document.getElementById("mute").onclick = (e) => { muted = !muted; e.currentTarget.textContent = muted ? "🔇" : "🔊"; };
+
+// ---- 定数 ----
+const R = 9;
+const DOCK = { x: W / 2, y: H - 34 };
+const GRAV = 900, REST = 0.92, MAX_SPEED = 1180, MIN_SPEED = 320;
+const COLS = 7, MARGIN_X = 22, GAP = 6;
+const BW = (W - MARGIN_X * 2 - GAP * (COLS - 1)) / COLS;
+const BH = 22, TOP_Y = 96, STEP_Y = BH + 8;
+const DANGER_Y = DOCK.y - 70;
+// ゴール（上端中央が開いている）
+const GOAL_X0 = W * 0.22, GOAL_X1 = W * 0.78, GOAL_LINE = 30;
+const KEEPER = { w: 56, h: 13, y: GOAL_LINE + 6, x: W / 2, dir: 1, speed: 130 };
+const DEF_COLORS = ["#ff5d73", "#ff8c42", "#e84393", "#c0392b"];
+
+// ---- 状態 ----
+let ball, defenders = [], particles = [], popups = [], trail = [];
+let combo = 0, score = 0, best = 0, goals = 0, shots = 0, turns = 0;
+let shake = 0, flash = 0;
+let state = "title";
+let aiming = false, aimStart = null, aimPos = null;
+const POWER_K = 6.5;
+const bestKey = "flickshoot.best";
+try { best = parseInt(localStorage.getItem(bestKey) || "0", 10) || 0; } catch (e) {}
+
+function newDef(col, row, hp) {
+  return { x: MARGIN_X + col * (BW + GAP), y: TOP_Y + row * STEP_Y, hp, maxhp: hp,
+           c: DEF_COLORS[(row + col) % DEF_COLORS.length] };
+}
+function spawnRow(rowOffset, density, hpBase) {
+  for (let col = 0; col < COLS; col++) {
+    if (Math.random() < density) defenders.push(newDef(col, rowOffset, hpBase + (Math.random() < 0.2 ? 1 : 0)));
+  }
+}
+function resetGame() {
+  defenders = []; particles = []; popups = []; trail = [];
+  combo = 0; score = 0; goals = 0; shots = 0; turns = 0; shake = 0; flash = 0;
+  for (let r = 0; r < 2; r++) spawnRow(r, 0.55, 1);
+  KEEPER.x = W / 2; KEEPER.speed = 130;
+  dockBall();
+  state = "aim";
+}
+function dockBall() { ball = { x: DOCK.x, y: DOCK.y, vx: 0, vy: 0, active: false }; combo = 0; trail = []; }
+
+// ---- 発射 ----
+function aimVec() {
+  if (!aimPos || !aimStart) return null;
+  // パチンコ式: 指でドラッグした「逆向き」に飛ぶ。下へ引っぱれば上へ飛ぶ。
+  // 画面のどこから始めてもOK（最下部の余白に依存しない）。
+  let dx = aimStart.x - aimPos.x, dy = aimStart.y - aimPos.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 10 || dy > -6) return null; // 下方向へ引く＝上へ飛ぶ場合のみ有効
+  let sp = Math.min(len * POWER_K, MAX_SPEED);
+  if (sp < MIN_SPEED) sp = MIN_SPEED;
+  return { vx: dx / len * sp, vy: dy / len * sp };
+}
+function launch() {
+  const v = aimVec();
+  if (!v) { aiming = false; aimStart = null; aimPos = null; return; }
+  ball.vx = v.vx; ball.vy = v.vy; ball.active = true;
+  state = "fly"; combo = 0; shots++;
+  aiming = false; aimStart = null; aimPos = null;
+  blip(360, 0.09, "sawtooth", 0.11);
+}
+
+// ---- 入力 ----
+function toLogical(cx, cy) { const r = canvas.getBoundingClientRect(); return { x: (cx - r.left) / r.width * W, y: (cy - r.top) / r.height * H }; }
+function pointerDown(x, y) {
+  if (actx && actx.state === "suspended") actx.resume();
+  if (state === "title") { resetGame(); return; }
+  if (state === "over") { if (overHit(x, y)) resetGame(); return; }
+  if (state === "aim") { aiming = true; aimStart = { x, y }; aimPos = { x, y }; }
+}
+function pointerMove(x, y) { if (aiming) aimPos = { x, y }; }
+function pointerUp() { if (state === "aim" && aiming) launch(); }
+canvas.addEventListener("mousedown", e => { const p = toLogical(e.clientX, e.clientY); pointerDown(p.x, p.y); });
+canvas.addEventListener("mousemove", e => { const p = toLogical(e.clientX, e.clientY); pointerMove(p.x, p.y); });
+window.addEventListener("mouseup", pointerUp);
+canvas.addEventListener("touchstart", e => { e.preventDefault(); const t = e.touches[0]; const p = toLogical(t.clientX, t.clientY); pointerDown(p.x, p.y); }, { passive: false });
+canvas.addEventListener("touchmove", e => { e.preventDefault(); const t = e.touches[0]; const p = toLogical(t.clientX, t.clientY); pointerMove(p.x, p.y); }, { passive: false });
+canvas.addEventListener("touchend", e => { e.preventDefault(); pointerUp(); }, { passive: false });
+const overBtn = { x: W / 2 - 80, y: H / 2 + 50, w: 160, h: 52 };
+function overHit(x, y) { return x >= overBtn.x && x <= overBtn.x + overBtn.w && y >= overBtn.y && y <= overBtn.y + overBtn.h; }
+
+// ---- エフェクト ----
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 260;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.5 + Math.random() * 0.4, t: 0, c: color, r: 1.5 + Math.random() * 2.5 });
+  }
+}
+function popup(x, y, text, color, big) { popups.push({ x, y, text, color, t: 0, life: big ? 1.2 : 0.8, big }); }
+
+// ---- ターン/ゴール ----
+function endTurn(scored) {
+  ball.active = false; turns++;
+  if (!scored) {
+    // 外したら敵が前進。控えは2回に1回だけ（増援は穏やかに）
+    for (const d of defenders) d.y += STEP_Y;
+    if (turns % 2 === 0) {
+      const density = Math.min(0.4 + turns * 0.012, 0.7);
+      spawnRow(0, density, 1 + Math.floor(turns / 10));
+    }
+    for (const d of defenders) if (d.y + BH >= DANGER_Y) { gameOver(); return; }
+  }
+  dockBall();
+  state = "aim";
+}
+function onGoal() {
+  goals++;
+  const bonus = 500 + 100 * combo;
+  score += bonus;
+  flash = 1; shake = 16;
+  popup(W / 2, H / 2 - 30, "G O A L !!", "#ffe14d", true);
+  popup(W / 2, H / 2 + 14, "+" + bonus, "#ffffff");
+  blip(523, 0.12, "square", 0.13);
+  setTimeout(() => blip(659, 0.12, "square", 0.13), 90);
+  setTimeout(() => blip(784, 0.2, "square", 0.13), 180);
+  // ゴールは"安心要素"。キーパーだけ強化し、敵が減りすぎた時のみ補充
+  KEEPER.speed = Math.min(KEEPER.speed + 20, 340);
+  if (defenders.length < 5) {
+    for (let r = 0; r < 2; r++) spawnRow(r, 0.55, 1 + Math.floor(goals / 4));
+  }
+  endTurn(true);
+}
+function gameOver() {
+  state = "over";
+  if (score > best) { best = score; try { localStorage.setItem(bestKey, String(best)); } catch (e) {} }
+  blip(180, 0.5, "triangle", 0.12);
+  setTimeout(() => blip(120, 0.6, "triangle", 0.12), 130);
+  shake = 14;
+}
+// ---- 更新 ----
+function step(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.t += dt;
+    if (p.t >= p.life) { particles.splice(i, 1); continue; }
+    p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = popups.length - 1; i >= 0; i--) { const p = popups[i]; p.t += dt; p.y -= 26 * dt; if (p.t >= p.life) popups.splice(i, 1); }
+  if (shake > 0) shake = Math.max(0, shake - dt * 40);
+  if (flash > 0) flash = Math.max(0, flash - dt * 2.2);
+
+  // キーパー（飛行中も常時左右移動）
+  if (state === "fly" || state === "aim") {
+    KEEPER.x += KEEPER.dir * KEEPER.speed * dt;
+    const left = GOAL_X0 + KEEPER.w / 2 + 2, right = GOAL_X1 - KEEPER.w / 2 - 2;
+    if (KEEPER.x < left) { KEEPER.x = left; KEEPER.dir = 1; }
+    if (KEEPER.x > right) { KEEPER.x = right; KEEPER.dir = -1; }
+  }
+
+  if (state !== "fly" || !ball.active) return;
+
+  const sub = 4, h = dt / sub;
+  for (let s = 0; s < sub; s++) {
+    ball.vy += GRAV * h; ball.x += ball.vx * h; ball.y += ball.vy * h;
+
+    // サイドライン
+    if (ball.x - R < 0) { ball.x = R; ball.vx = Math.abs(ball.vx) * REST; wallFx(); }
+    else if (ball.x + R > W) { ball.x = W - R; ball.vx = -Math.abs(ball.vx) * REST; wallFx(); }
+
+    // 上端：ゴール枠の外はバー反射、枠内はゴール判定
+    if (ball.y - R < GOAL_LINE) {
+      const inMouth = ball.x > GOAL_X0 + R && ball.x < GOAL_X1 - R;
+      if (inMouth && ball.vy < 0) {
+        if (ball.y < GOAL_LINE) { onGoal(); return; }
+      } else {
+        ball.y = GOAL_LINE + R; ball.vy = Math.abs(ball.vy) * REST; wallFx();
+      }
+    }
+
+    // キーパーに当たればセーブ（反射）
+    if (rectHit(KEEPER.x - KEEPER.w / 2, KEEPER.y, KEEPER.w, KEEPER.h)) {
+      const ox = (ball.x < KEEPER.x) ? (KEEPER.x - KEEPER.w / 2 - (ball.x + R)) : (KEEPER.x + KEEPER.w / 2 - (ball.x - R));
+      const oy = (ball.y < KEEPER.y + KEEPER.h / 2) ? (KEEPER.y - (ball.y + R)) : (KEEPER.y + KEEPER.h - (ball.y - R));
+      if (Math.abs(oy) < Math.abs(ox)) { ball.y += oy; ball.vy = -ball.vy * 1.02; }
+      else { ball.x += ox; ball.vx = -ball.vx; }
+      burst(ball.x, ball.y, "#ffffff", 8);
+      shake = Math.max(shake, 8);
+      blip(200, 0.08, "square", 0.1);
+      popup(KEEPER.x, KEEPER.y - 6, "SAVE!", "#9fefff");
+    }
+
+    // 下に抜けたらシュート終了（外し）
+    if (ball.y - R > H) { endTurn(false); return; }
+
+    // ディフェンダー衝突
+    for (let i = 0; i < defenders.length; i++) {
+      const d = defenders[i];
+      if (ball.x + R < d.x || ball.x - R > d.x + BW || ball.y + R < d.y || ball.y - R > d.y + BH) continue;
+      d.hp--; combo++;
+      score += 10 * Math.max(1, combo);
+      burst(d.x + BW / 2, d.y + BH / 2, d.c, d.hp <= 0 ? 16 : 6);
+      shake = Math.min(2 + combo * 0.8, 15);
+      blip(300 + Math.min(combo, 22) * 42, 0.06, "square", 0.09);
+      if (combo >= 3) popup(d.x + BW / 2, d.y, "突破 x" + combo, d.c);
+      if (d.hp <= 0) {
+        // 軽い相手は撃ち抜いて貫通（連鎖が伸びる）
+        defenders.splice(i, 1);
+        ball.vx *= 0.96; ball.vy *= 0.96;
+      } else {
+        // 装甲持ちは弾き返す
+        const ox = (ball.x < d.x + BW / 2) ? (d.x - (ball.x + R)) : (d.x + BW - (ball.x - R));
+        const oy = (ball.y < d.y + BH / 2) ? (d.y - (ball.y + R)) : (d.y + BH - (ball.y - R));
+        if (Math.abs(ox) < Math.abs(oy)) { ball.x += ox; ball.vx = -ball.vx; }
+        else { ball.y += oy; ball.vy = -ball.vy; }
+      }
+      break;
+    }
+  }
+  trail.push({ x: ball.x, y: ball.y }); if (trail.length > 14) trail.shift();
+}
+function rectHit(rx, ry, rw, rh) { return !(ball.x + R < rx || ball.x - R > rx + rw || ball.y + R < ry || ball.y - R > ry + rh); }
+function wallFx() { blip(230, 0.04, "sine", 0.05); shake = Math.max(shake, 3); }
+
+// ---- 描画 ----
+function draw() {
+  ctx.save();
+  ctx.clearRect(-20, -20, W + 40, H + 40);
+
+  // ピッチ
+  for (let i = 0; i < 10; i++) {
+    ctx.fillStyle = i % 2 ? "#1f7a3a" : "#23843f";
+    ctx.fillRect(0, i * H / 10, W, H / 10);
+  }
+  // センターサークル風
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 46, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+
+  // ペナルティエリア + ゴール枠 + ネット
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3;
+  ctx.strokeRect(GOAL_X0 - 26, GOAL_LINE, (GOAL_X1 - GOAL_X0) + 52, 64);
+  // ゴールネット
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(GOAL_X0, 0, GOAL_X1 - GOAL_X0, GOAL_LINE);
+  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+  for (let x = GOAL_X0; x <= GOAL_X1; x += 9) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GOAL_LINE); ctx.stroke(); }
+  for (let y = 4; y < GOAL_LINE; y += 9) { ctx.beginPath(); ctx.moveTo(GOAL_X0, y); ctx.lineTo(GOAL_X1, y); ctx.stroke(); }
+  // ゴールポスト
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(GOAL_X0 - 4, 0, 4, GOAL_LINE + 4);
+  ctx.fillRect(GOAL_X1, 0, 4, GOAL_LINE + 4);
+  ctx.fillRect(GOAL_X0 - 4, GOAL_LINE, (GOAL_X1 - GOAL_X0) + 8, 4);
+
+  // 危険ライン
+  ctx.strokeStyle = "rgba(255,80,90,0.55)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+  ctx.beginPath(); ctx.moveTo(0, DANGER_Y); ctx.lineTo(W, DANGER_Y); ctx.stroke(); ctx.setLineDash([]);
+
+  // キーパー
+  ctx.fillStyle = "#1b1b2a";
+  roundRect(KEEPER.x - KEEPER.w / 2, KEEPER.y, KEEPER.w, KEEPER.h, 4); ctx.fill();
+  ctx.fillStyle = "#ffd24d";
+  roundRect(KEEPER.x - KEEPER.w / 2, KEEPER.y, KEEPER.w, 4, 2); ctx.fill();
+
+  // ディフェンダー
+  for (const d of defenders) {
+    const a = 0.6 + 0.4 * (d.hp / d.maxhp);
+    ctx.fillStyle = d.c; ctx.globalAlpha = a;
+    roundRect(d.x, d.y, BW, BH, 5); ctx.fill(); ctx.globalAlpha = 1;
+    if (d.maxhp > 1) {
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 12px system-ui";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(d.hp), d.x + BW / 2, d.y + BH / 2 + 1);
+    }
+  }
+
+  // トレイル
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i], a = i / trail.length;
+    ctx.fillStyle = "rgba(255,255,255," + (a * 0.45) + ")";
+    ctx.beginPath(); ctx.arc(t.x, t.y, R * a, 0, Math.PI * 2); ctx.fill();
+  }
+
+  if (state === "aim" && aiming && aimPos) drawAim();
+
+  // ボール（サッカーボール風）
+  if (ball) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "#1b1b2a";
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, R * 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#1b1b2a"; ctx.lineWidth = 1.4;
+    for (let k = 0; k < 5; k++) {
+      const ang = k / 5 * Math.PI * 2 - 0.4;
+      ctx.beginPath(); ctx.moveTo(ball.x + Math.cos(ang) * R * 0.34, ball.y + Math.sin(ang) * R * 0.34);
+      ctx.lineTo(ball.x + Math.cos(ang) * R, ball.y + Math.sin(ang) * R); ctx.stroke();
+    }
+  }
+
+  // ドック（足元マーク）
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  roundRect(DOCK.x - 26, DOCK.y + R + 2, 52, 6, 3); ctx.fill();
+
+  for (const p of particles) { ctx.globalAlpha = Math.max(0, 1 - p.t / p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  for (const p of popups) {
+    ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
+    ctx.fillStyle = p.color; ctx.font = "bold " + (p.big ? 40 : 18) + "px system-ui";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+
+  drawHUD();
+  if (flash > 0) { ctx.fillStyle = "rgba(255,255,200," + (flash * 0.5) + ")"; ctx.fillRect(0, 0, W, H); }
+  if (state === "title") drawTitle();
+  if (state === "over") drawOver();
+  ctx.restore();
+}
+
+function drawAim() {
+  const v = aimVec(); if (!v) return;
+  ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
+  let px = DOCK.x, py = DOCK.y, pvx = v.vx, pvy = v.vy; const ph = 1 / 60;
+  ctx.beginPath(); ctx.moveTo(px, py);
+  for (let i = 0; i < 80; i++) {
+    pvy += GRAV * ph; px += pvx * ph; py += pvy * ph;
+    if (px - R < 0) { px = R; pvx = Math.abs(pvx) * REST; }
+    else if (px + R > W) { px = W - R; pvx = -Math.abs(pvx) * REST; }
+    if (py - R < GOAL_LINE) { const inMouth = px > GOAL_X0 + R && px < GOAL_X1 - R; if (!inMouth) { py = GOAL_LINE + R; pvy = Math.abs(pvy) * REST; } else break; }
+    if (py > H) break;
+    if (i % 2 === 0) ctx.lineTo(px, py);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawHUD() {
+  ctx.fillStyle = "#eafff0"; ctx.font = "bold 22px system-ui";
+  ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.fillText(String(score), 14, 10);
+  ctx.font = "12px system-ui"; ctx.fillStyle = "#bfeccb";
+  ctx.fillText("BEST " + best + "   ⚽ " + goals, 14, 36);
+  if (state === "fly" && combo >= 2) {
+    ctx.textAlign = "right"; ctx.fillStyle = "#ffe14d"; ctx.font = "bold 22px system-ui";
+    ctx.fillText("x" + combo + " 突破", W - 14, 10);
+  }
+}
+function drawTitle() {
+  dim(); ctx.textAlign = "center"; ctx.fillStyle = "#eafff0";
+  ctx.font = "bold 40px system-ui"; ctx.fillText("FLICK", W / 2, H / 2 - 80);
+  ctx.fillStyle = "#5ddf8a"; ctx.fillText("SHOOT", W / 2, H / 2 - 36);
+  ctx.font = "14px system-ui"; ctx.fillStyle = "#cdeed6";
+  ctx.fillText("下へ引っぱって離す = 上へシュート", W / 2, H / 2 + 16);
+  ctx.fillText("長く引くほど強い・ナナメに引くと逆へ飛ぶ", W / 2, H / 2 + 40);
+  ctx.fillText("DFを撃ち抜きキーパーをかわしてGOAL", W / 2, H / 2 + 64);
+  ctx.fillStyle = "#5ddf8a"; ctx.font = "bold 18px system-ui";
+  ctx.fillText("▶ タップでキックオフ", W / 2, H / 2 + 108);
+}
+function drawOver() {
+  dim(); ctx.textAlign = "center";
+  ctx.fillStyle = "#ff5d73"; ctx.font = "bold 34px system-ui";
+  ctx.fillText("試合終了", W / 2, H / 2 - 96);
+  ctx.fillStyle = "#eafff0"; ctx.font = "bold 46px system-ui";
+  ctx.fillText(String(score), W / 2, H / 2 - 34);
+  ctx.font = "15px system-ui"; ctx.fillStyle = "#cdeed6";
+  ctx.fillText("ゴール " + goals + " ・ シュート " + shots, W / 2, H / 2 + 2);
+  ctx.fillStyle = "#bfeccb"; ctx.font = "13px system-ui";
+  ctx.fillText("BEST " + best + (score >= best && score > 0 ? "  🎉新記録!" : ""), W / 2, H / 2 + 24);
+  ctx.fillStyle = "#5ddf8a"; roundRect(overBtn.x, overBtn.y, overBtn.w, overBtn.h, 12); ctx.fill();
+  ctx.fillStyle = "#05140a"; ctx.font = "bold 20px system-ui"; ctx.textBaseline = "middle";
+  ctx.fillText("再キックオフ", W / 2, overBtn.y + overBtn.h / 2); ctx.textBaseline = "alphabetic";
+}
+function dim() { ctx.fillStyle = "rgba(4,20,10,0.8)"; ctx.fillRect(0, 0, W, H); }
+function roundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+let last = performance.now();
+function loop(now) {
+  let dt = (now - last) / 1000; last = now; if (dt > 0.05) dt = 0.05;
+  step(dt); draw(); requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
