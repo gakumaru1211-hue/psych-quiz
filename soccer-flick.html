@@ -301,7 +301,6 @@ function wallFx() { blip(230, 0.04, "sine", 0.05); shake = Math.max(shake, 3); }
 // ---- 描画 ----
 function draw() {
   ctx.save();
-  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   ctx.clearRect(-20, -20, W + 40, H + 40);
 
   // ピッチ
