@@ -314,7 +314,7 @@ function mentalMultiplier(){
     (0.80 + 0.35*(m.conf/100)) *
     (0.80 + 0.35*(m.focus/100)) *
     (1 - 0.45*(m.stress/100)/tough);
-  return Math.max(0.2, mul);   // 不調≈0.2 / 平凡≈0.9 / 絶好調≈1.5
+  return Math.max(0.4, mul);   // 不調≈0.4 / 平凡≈0.9 / 絶好調≈1.5
 }
 
 /* その週に選手が"いちばん欲しがっている声かけ" ---------------------------
@@ -581,11 +581,11 @@ function estimateGrowth(train, matched){
   const keys = train.target==="_random" ? null : [train.target];
   const calc = tk=>{
     const head=clamp((G.potential-G.stats[tk])/G.potential,0,1);
-    let g=2.5*mul*trainMul*fitMul*(0.35+0.65*head)*respond;
+    let g=3.55*mul*trainMul*fitMul*(0.5+0.5*head)*respond;
     if(G.awaken) g*=1.4;
-    return Math.max(0.2,g);
+    return Math.max(0.4,g);
   };
-  if(!keys) return [{k:"?",amt:2.5*mul*trainMul*fitMul*respond}]; // 自主練=ランダム
+  if(!keys) return [{k:"?",amt:3.55*mul*trainMul*fitMul*respond}]; // 自主練=ランダム
   if(train.id==="iq" && G.selTalk==="together") return [{k:"iq",amt:calc("iq")*1.6}];
   return keys.map(tk=>({k:tk,amt:calc(tk)}));
 }
@@ -716,9 +716,9 @@ function advanceWeek(){
       targets.forEach(tk=>{
         const cur = G.stats[tk];
         const headroom = clamp((G.potential - cur)/G.potential, 0, 1); // capに近いほど伸びにくい
-        let gain = rnd(1.9,3.1) * mul * trainMul * fitMul * (0.35 + 0.65*headroom) * respond;
+        let gain = rnd(2.8,4.3) * mul * trainMul * fitMul * (0.5 + 0.5*headroom) * respond;
         if(G.awaken) gain *= 1.4;
-        gain = Math.max(0.2, gain);
+        gain = Math.max(0.6, gain);
         G.stats[tk] = clamp(cur + gain, 0, G.potential);
         pushLog(`${STAT_INFO[tk].e} ${STAT_INFO[tk].n} <span class="gain">+${gain.toFixed(1)}</span>（→${round(G.stats[tk])}）`);
       });
