@@ -265,36 +265,51 @@ const OPP_NAMES = ["青嵐FC","セント・ロア","紅蓮ユナイテッド","�
   "雷鳴アスレチコ","碧波クラブ","暁ロヴァーズ","隼スポルティング","狼煙FC","海凪マリナーズ"];
 const FIRST = ["ハル","レン","ソラ","カイ","リク","ツバサ","ジン","アサヒ","ユウ","タクミ","ハヤテ","ノア"];
 
+// ステージ（昇格ラダー）。優勝すると上へ昇格し、潜在能力の上限が大きく開放される＝育成が伸び続ける。
+const STAGES = [
+  {n:"ユースチーム", e:"🌱", oppBase:40, mate:34, cap:72},
+  {n:"3部リーグ",    e:"⚽", oppBase:52, mate:46, cap:80},
+  {n:"2部リーグ",    e:"🔰", oppBase:62, mate:56, cap:86},
+  {n:"1部リーグ",    e:"🏆", oppBase:72, mate:66, cap:92},
+  {n:"ナショナル代表",e:"🎌", oppBase:82, mate:76, cap:97},
+  {n:"世界の舞台",   e:"🌍", oppBase:91, mate:85, cap:99},
+];
+
 /* ---- ゲーム状態 ---------------------------------------------------------- */
 let G = null;
 function newGame(name, posKey){
   const pers = pick(Object.keys(PERSONALITIES));
   const P = PERSONALITIES[pers];
-  const potential = round(rnd(P.pot[0], P.pot[1]));
   const base = ()=> round(rnd(28,42));
   const stats = {}; STAT_KEYS.forEach(k=> stats[k]=base());
   // ポジション主要ステータスを少し底上げ
   POSITIONS[posKey].key.forEach((k,i)=> stats[k]=clamp(stats[k]+ (10-i*3)));
+  // 才能（=この選手の地力）。各ステージの上限を才能ぶん底上げ／差し引きする。
+  const talent = round(rnd(P.pot[0], P.pot[1]));
+  const talentBonus = round((talent-80)/3);
   G = {
-    name, pos:posKey, pers, potential,
-    age:15, week:1, season:1, maxSeason:3,
+    name, pos:posKey, pers, talent, talentBonus,
+    stage:0, potential: clamp(STAGES[0].cap + talentBonus, 50, 99),
+    age:15, week:1, season:1,
     stats,
     mentals:{moti:62, conf:55, focus:55, stress:18},
     bond:0, fitness:100,
-    matchIdx:0, results:[], goals:0, momCount:0,
+    matchIdx:0, results:[], goals:0, seasonGoals:0, momCount:0, careerGoals:0,
     nextMatchWeek:4, opp:null,
     awaken:false, injured:0,
+    trophies:[], retired:false, won:false,
     log:[], pendingEvent:null, over:false,
     selTraining:null, selTalk:null,
   };
   rollOpponent();
-  pushLog(`<span class="sys">— ${name}（${PERSONALITIES[pers].n}）の物語が始まる。次の試合は第4週。—</span>`);
+  pushLog(`<span class="sys">— ${name}（${PERSONALITIES[pers].n}）の物語が始まる。まずは ${STAGES[0].n} で頭角を現せ。—</span>`);
   return G;
 }
 
 function rollOpponent(){
-  const diff = (G.season-1)*16 + G.matchIdx*3 + irnd(-4,4);
-  G.opp = { name:pick(OPP_NAMES), power: clamp(40+diff, 30, 96) };
+  const st = STAGES[G.stage];
+  const diff = G.matchIdx*4 + irnd(-5,5);
+  G.opp = { name:pick(OPP_NAMES), power: clamp(st.oppBase+diff, 28, 99) };
 }
 
 function ovr(){
@@ -390,7 +405,7 @@ function renderTitle(){
         </select>
       </div>
       <button class="btn" id="startBtn">この選手を育てる ▶</button>
-      <p class="hint">性格タイプはスカウト時にランダムで決まります。<br>3シーズン後、彼はどんな選手になっているか――。</p>
+      <p class="hint">性格はスカウト時にランダムで決定。<br>ユースから世界の頂点まで、舞台を駆け上がれ――。</p>
     </div>
     <div class="footer">© Football Soul — a mind-driven football raising game</div>
   `;
@@ -447,9 +462,10 @@ function renderWeek(){
         <div class="ovr"><b>${ovr()}</b><span>OVR</span></div>
       </div>
       <div class="ptags">
-        <span class="ptag gold">潜在 ${G.potential}</span>
-        <span class="ptag">絆 Lv.${Math.floor(G.bond/10)}</span>
-        <span class="ptag">${weeksToMatch<=0?"⚽今週は試合！":`次の試合まで ${weeksToMatch}週`}</span>
+        <span class="ptag gold">${STAGES[G.stage].e} ${STAGES[G.stage].n}</span>
+        <span class="ptag">潜在 ${G.potential}</span>
+        <span class="ptag">⚽今季 ${G.seasonGoals}</span>
+        <span class="ptag">${weeksToMatch<=0?"🔥今週は試合！":`試合まで ${weeksToMatch}週`}</span>
         ${G.awaken?'<span class="ptag gold">✨覚醒中</span>':''}
         ${G.injured>0?`<span class="ptag" style="background:rgba(255,93,108,.25);border-color:rgba(255,93,108,.5)">🩹離脱 ${G.injured}週</span>`:''}
       </div>
@@ -500,13 +516,12 @@ function renderWeek(){
 
     <div class="panel">
       <h2 class="section">② どんな声をかける？</h2>
-      <p class="hint" style="margin:-4px 0 10px;text-align:left">本音を読んで、いま必要な言葉を選ぼう。<span style="color:#c98a00;font-weight:800">いま響く♥</span>に合わせると効果UP。</p>
+      <p class="hint" style="margin:-4px 0 10px;text-align:left">上の<b>本音</b>を読んで、いま必要な言葉を見極めよう。</p>
       <div class="choices" id="tkChoices">
         ${TALKS.map(t=>{
-          const h = talkHint(t);
           return `<button class="choice ${G.selTalk===t.id?'sel':''}" data-tk="${t.id}">
             <div class="ico">${t.e}</div>
-            <div class="tx"><div class="h">${t.n} ${h?`<span class="tag" style="background:${h.bg};color:${h.c}">${h.t}</span>`:''}</div>
+            <div class="tx"><div class="h">${t.n}</div>
               <div class="d">${t.d}</div></div>
           </button>`;
         }).join("")}
@@ -537,15 +552,6 @@ function renderWeek(){
   $("#helpPill").onclick = showHelp;
   $("#mulInfo").onclick = showHelp;
   refreshPreview();
-}
-
-/* 声かけのヒント（その週の状態で動的に変化） */
-function talkHint(t){
-  const m=G.mentals;
-  if(t.type==="push" && m.stress>=64) return {t:"逆効果かも",bg:"#ffeef0",c:"#d6433c"};
-  if(t.type==="rest" && m.stress<=22) return {t:"今は不要",bg:"#eef1f5",c:"#7a8a99"};
-  if(t.type===G.curNeed) return {t:"いま響く♥",bg:"#fff3d6",c:"#c98a00"};
-  return null;
 }
 
 /* 声かけの結果を一元計算（プレビューと実処理で共通利用） */
@@ -599,31 +605,26 @@ function refreshPreview(){
   }
   const train = TRAININGS.find(x=>x.id===G.selTraining);
   const talk  = TALKS.find(x=>x.id===G.selTalk);
-  let gh="", mh="", note="";
+  let gh="", mh="";
   if(talk){
-    const o=talkOutcome(talk);
-    if(o.backfire) note=`<span class="warn">⚠ ストレス過多。厳しい言葉は逆効果になりそう。</span>`;
-    else if(o.waste) note=`<span class="warn">余裕あり。休ませる必要はなさそう。</span>`;
-    else if(o.matched) note=`<span class="up">♥ 今いちばん欲しい言葉。深く響く！</span>`;
+    // 声かけの"素の傾向"だけを表示（刺さるかどうかは本音を読んで自分で判断）
     const parts=[];
     [["moti","やる気"],["conf","自信"],["focus","集中"],["stress","ストレス"]].forEach(([k,n])=>{
-      const v=o.d[k]; if(Math.abs(v)<0.5) return;
+      const v=talk.eff[k]; if(Math.abs(v)<0.5) return;
       const good = (k==="stress") ? v<0 : v>0;
-      parts.push(`<span class="${good?'up':'dn'}">${n}${v>0?'+':''}${round(v)}</span>`);
+      parts.push(`<span class="${good?'up':'dn'}">${n}${v>0?'+':''}${v}</span>`);
     });
     mh = parts.join(" / ");
   }
   if(train){
-    const matched = talk ? talkOutcome(talk).matched : false;
-    const gs=estimateGrowth(train, matched);
+    const gs=estimateGrowth(train, false); // 概算は標準ケースで表示
     if(train.target==="_rest") gh=`<span class="up">🛌 コンディション回復・ストレス大幅減</span>`;
     else if(gs.length && gs[0].k==="?") gh=`<span class="gain">⁇ ランダムな能力が ≈+${gs[0].amt.toFixed(1)} ×2か所（高負荷）</span>`;
     else gh = gs.map(g=>`<span class="gain">${STAT_INFO[g.k].e}${STAT_INFO[g.k].n} ≈+${g.amt.toFixed(1)}</span>`).join(" / ");
   }
-  box.innerHTML = `<div class="preview"><div class="ttl">▶ 予想される一週間</div>
+  box.innerHTML = `<div class="preview"><div class="ttl">▶ 予想される一週間（おおよそ）</div>
     ${gh?`<div>📈 成長：${gh}</div>`:''}
-    ${mh?`<div>🧠 心理：${mh}</div>`:''}
-    ${note?`<div>${note}</div>`:''}
+    ${mh?`<div>🧠 声かけの傾向：${mh}</div>`:''}
     ${!gh&&!mh?'<span class="empty">もう片方も選ぶと全体が見えます。</span>':''}
   </div>`;
 }
@@ -635,16 +636,14 @@ function showHelp(){
      やる気・自信・集中が高く、ストレスが低いほど、同じ練習でも成長量が
      <b>×0.2〜×1.5以上</b>に変化。まず心を整えるのが最優先。<br><br>
      <b>② 声かけの正解は毎週変わる</b><br>
-     選手は毎週ちがう本音を漏らす。その<b>本音に合った声かけ</b>＝
-     <span style="color:#c98a00;font-weight:800">「いま響く♥」</span>を選ぶと効果が1.5倍になり、絆も深まる。<br>
+     選手は毎週ちがう<b>本音</b>を漏らす。それを読んで合う言葉を選ぶと効果が1.5倍になり絆も深まる（答えは自分で見極めて）。<br>
      ・自信がない→褒める／気が乗らない→夢を語る<br>
      ・緩んでる→厳しく要求／疲れてる→休もう／迷ってる→一緒に考える<br><br>
      <b>③ やってはいけない</b><br>
-     ストレスが高い時の<span style="color:#d6433c;font-weight:800">「厳しく要求」は逆効果</span>。
-     放置するとスランプ・ケガに。<br><br>
-     <b>④ 流れ</b><br>
-     練習でストレスは溜まる→声かけ＆休養でケア→心を整えて伸ばす→4週ごとの試合で成長を試す。
-     <b>覚醒(ゾーン)</b>に入れば成長が加速！</div>`,
+     ストレスが高い時の「厳しく要求」は逆効果。放置するとスランプ・ケガに。<br><br>
+     <b>④ 上の舞台へ昇格＝育成が伸び続ける</b><br>
+     リーグで<b>勝ち越して優勝</b>すると上のステージへ昇格し、<b>潜在能力(上限)が大きく開放</b>される。
+     最高峰「世界の舞台」を制せば世界一。引退の時期も自分で選べる。</div>`,
     [{t:"わかった！",cls:"btn",fn:closeModal}]);
 }
 
@@ -882,7 +881,7 @@ function playMatch(){
   const playerPow = key.reduce((s,k)=>s+G.stats[k],0)/key.length;
   const m=G.mentals;
   const psy = (0.7 + 0.3*(m.conf/100)) * (0.8+0.2*(m.focus/100)) * (1-0.3*(m.stress/100));
-  const teammate = 38 + (G.season-1)*6 + G.bond*0.12;
+  const teammate = STAGES[G.stage].mate + G.bond*0.12;
   let ourPow = (playerPow*1.15*psy + teammate)/2;
   if(G.awaken) ourPow*=1.12;
   if(G.injured>0) ourPow*=0.8; // 万全でない
@@ -901,7 +900,7 @@ function playMatch(){
       // 得点関与
       const involve = Math.random();
       if(G.pos==="FW" || (G.pos==="MF"&&involve<0.6)){
-        if(involve<0.55){ events.push({m:min,t:`<span class="good">⚽ ${min}' ${G.name}のゴール！！</span>`}); G.goals++; perf+=3; }
+        if(involve<0.55){ events.push({m:min,t:`<span class="good">⚽ ${min}' ${G.name}のゴール！！</span>`}); G.goals++; G.seasonGoals++; G.careerGoals++; perf+=3; }
         else { events.push({m:min,t:`<span class="good">🅰️ ${min}' ${G.name}のアシスト！</span>`}); perf+=2; }
       } else if(G.pos==="DF"||G.pos==="GK"){
         events.push({m:min,t:`<span class="good">⚽ ${min}' 味方のゴール！ ${G.name}も攻撃参加</span>`}); perf+=1;
@@ -983,51 +982,101 @@ function endSeason(){
   const W=G.results.filter(r=>r==="WIN").length;
   const D=G.results.filter(r=>r==="DRAW").length;
   const L=G.results.filter(r=>r==="LOSE").length;
+  const champion = W>=2;                       // 過半数勝利でリーグ制覇
+  const st = STAGES[G.stage];
+  const topStage = G.stage>=STAGES.length-1;
+  const newTrophies=[];
 
-  if(G.season >= G.maxSeason){
-    G.over=true; renderEnding(); return;
+  if(champion){
+    newTrophies.push(`${st.n} 優勝`);
+    if(G.seasonGoals>=4) newTrophies.push(`得点王（${G.seasonGoals}G）`);
+    G.trophies.push(...newTrophies);
   }
 
-  // 次シーズンへ：年齢UP・潜在能力が少し開花・コンディション回復
-  const grow = irnd(2,5);
-  G.potential = clamp(G.potential + grow, 0, 99);
+  // 最高峰で優勝 → 世界一クライマックス（終幕）
+  if(champion && topStage){
+    G.won=true; G.over=true;
+    showModal("🌍","世界の頂点へ —",
+      `${G.name}は世界の舞台を制した。<br>かつて ${STAGES[0].n} で出会ったあの日から、いくつもの夜を越えて――<br>
+       <span style="color:#159a52;font-weight:800">ついに、世界一。</span>`,
+      [{t:"エンディングを見る ▶",cls:"btn",fn:()=>{ closeModal(); renderEnding(); }}]);
+    return;
+  }
+
+  // 昇格処理 ＆ 潜在能力の開放
+  const oldPot=G.potential;
+  let promoMsg="";
+  if(champion && !topStage){
+    G.stage++;
+    G.talentBonus += irnd(1,3);  // 経験による地力の伸び（限界突破）
+    G.potential = clamp(STAGES[G.stage].cap + G.talentBonus, 50, 99);
+    promoMsg = `<div style="margin:10px 0;padding:10px;background:#eafaf0;border-radius:10px">
+      🎉 <b>${STAGES[G.stage].e} ${STAGES[G.stage].n} へ昇格！</b><br>
+      新たな舞台で、潜在能力が <span style="color:#159a52;font-weight:800">${oldPot} → ${G.potential}</span> に開放された。<br>
+      <span class="sys">伸びしろが一気に広がった。まだまだ強くなれる。</span></div>`;
+  } else {
+    // 残留：地力の微成長で頭打ちを防ぐ
+    G.talentBonus += 1;
+    G.potential = clamp(STAGES[G.stage].cap + G.talentBonus, 50, 99);
+    promoMsg = `<div class="sys" style="margin:8px 0">優勝には届かず、${st.n} に残留。来季こそ昇格を狙おう。（潜在 ${oldPot}→${G.potential}）</div>`;
+  }
+
+  // 次シーズンへ
   G.age++; G.season++; G.week=1; G.results=[];
-  G.nextMatchWeek=4; G.matchIdx=0;
+  G.nextMatchWeek=4; G.matchIdx=0; G.seasonGoals=0;
   G.fitness=100;
   G.mentals.stress=clamp(G.mentals.stress-20);
   G.mentals.moti=clamp(G.mentals.moti+10);
   rollOpponent();
 
-  showModal("🏆", `第${G.season-1}季 終了`,
-    `今季の成績：<b>${W}勝 ${D}分 ${L}敗</b>　ゴール ${G.goals}　MOM ${G.momCount}回<br><br>
-     ${G.name}は ${G.age}歳になり、潜在能力が <span style="color:#159a52;font-weight:800">+${grow}（→${G.potential}）</span> 開花した。<br>
-     <span class="sys">いよいよ第${G.season}季。夢の舞台が近づいてくる。</span>`,
-    [{t:`第${G.season}季を始める ▶`,cls:"btn",fn:()=>{ closeModal(); render(); }}]);
+  const trophyLine = newTrophies.length
+    ? `<div style="color:#c98a00;font-weight:800;margin:6px 0">🏆 獲得：${newTrophies.join(" / ")}</div>` : "";
+
+  const buttons=[{t:`第${G.season}季を始める ▶`,cls:"btn",fn:()=>{ closeModal(); render(); }}];
+  // プロ（2部以上）に到達していれば、好きなタイミングで引退＝物語を締められる
+  if(G.stage>=2 || G.season>=4){
+    buttons.push({t:"ここで現役を引退する",cls:"btn ghost",fn:()=>{ closeModal(); G.retired=true; G.over=true; renderEnding(); }});
+  }
+
+  showModal(champion?"🏆":st.e, `第${G.season-1}季 終了 ・ ${st.n}`,
+    `成績：<b>${W}勝 ${D}分 ${L}敗</b>　今季 ${G.seasonGoals}ゴール　🏅MOM ${G.momCount}回<br>
+     ${trophyLine}${promoMsg}
+     <span class="sys">${G.name}は ${G.age}歳になった。</span>`,
+    buttons);
 }
 
 function renderEnding(){
   const o=ovr();
-  const totalW = G.results ? 0 : 0;
-  // 評価決定
-  let title, ico, desc, rank;
-  const m=G.mentals;
-  const happy = m.stress<50 && G.bond>25;
-  if(o>=88){ rank="SS"; ico="🌍"; title="世界が恋した天才";
-    desc=`${G.name}は欧州の頂点へと羽ばたいた。ピッチに立つだけでスタジアムが沸く、時代を象徴するスーパースター。あの日キミがかけた言葉が、ひとつの伝説を育てたのだ。`;}
-  else if(o>=78){ rank="S"; ico="⭐"; title="国を背負うエース";
-    desc=`${G.name}は代表のエースナンバーを背負う存在に。重圧の中でも自分を見失わなかったのは、心を支え続けたキミがいたから。`;}
-  else if(o>=68){ rank="A"; ico="🏅"; title="プロのレギュラー";
-    desc=`${G.name}はプロの世界で確かな地位を築いた。派手さはなくとも、チームに欠かせない頼れる選手へ。着実な成長の物語だった。`;}
-  else if(o>=58){ rank="B"; ico="⚽"; title="未来のある若手";
-    desc=`${G.name}はプロ契約を勝ち取った。まだ荒削りだが、伸びしろは十分。物語はここから続いていく。`;}
-  else { rank="C"; ico="🌱"; title="それでも、サッカーが好き";
-    desc=`トップには届かなかった。それでも${G.name}はボールを蹴る喜びを失わなかった。${happy?'笑顔で':''}次の夢へと歩き出す。`;}
+  const reached = STAGES[G.stage];
+  const leagueTitles = G.trophies.filter(t=>t.includes("優勝")).length;
+  let title, ico, desc;
+
+  if(G.won){
+    ico="🌍"; title="世界を獲った男";
+    desc=`${G.name}はサッカーの頂点に立った。${STAGES[0].n}で出会った荒削りな少年が、世界中が憧れるスーパースターへ。
+      ${leagueTitles}個のタイトルが、その歩みを物語る。あの日キミがかけ続けた言葉が、ひとつの伝説を育てたのだ。`;
+  } else {
+    // 引退エンディング：到達ステージと称号で物語が変わる
+    ico=reached.e;
+    if(G.stage>=4){ title="国を背負った英雄";
+      desc=`${G.name}は代表のエースとして一時代を築き、惜しまれながらピッチを去った。世界一には届かなかったが、その背中は次の世代の憧れになった。`;}
+    else if(G.stage>=3){ title="トップリーグの主役";
+      desc=`${G.name}は1部の舞台で輝き続けた。華やかなキャリアの裏に、心を支え続けたキミとの日々があった。`;}
+    else if(G.stage>=2){ title="プロで戦い抜いた誇り";
+      desc=`${G.name}はプロの世界を駆け抜けた。派手さよりも、折れずに伸び続けたその姿こそが財産だった。`;}
+    else { title="それでも、サッカーが好き";
+      desc=`大きな舞台には届かなかった。それでも${G.name}はボールを蹴る喜びを失わなかった。物語は、ここから別のかたちで続いていく。`;}
+  }
+
+  const trophyTags = G.trophies.length
+    ? G.trophies.map(t=>`<span class="ptag gold">🏆${t}</span>`).join("")
+    : `<span class="ptag">無冠（それも誇り）</span>`;
 
   app.innerHTML = `
     <div class="title-hero">
       <div class="ball">${ico}</div>
       <h1>${title}</h1>
-      <p>― FOOTBALL SOUL ・ 育成の記録 ―</p>
+      <p>― FOOTBALL SOUL ・ ${G.name} の物語 ―</p>
     </div>
     <div class="pcard">
       <div class="shine"></div>
@@ -1038,11 +1087,15 @@ function renderEnding(){
         <div class="ovr"><b>${o}</b><span>FINAL OVR</span></div>
       </div>
       <div class="ptags">
-        <span class="ptag gold">評価ランク ${rank}</span>
-        <span class="ptag">通算 ⚽${G.goals}ゴール</span>
+        <span class="ptag gold">到達 ${reached.e}${reached.n}</span>
+        <span class="ptag">通算 ⚽${G.careerGoals}ゴール</span>
         <span class="ptag">🏅MOM ${G.momCount}回</span>
         <span class="ptag">絆 Lv.${Math.floor(G.bond/10)}</span>
       </div>
+    </div>
+    <div class="panel">
+      <h2 class="section">獲得タイトル（${G.trophies.length}）</h2>
+      <div class="ptags" style="padding:0">${trophyTags}</div>
     </div>
     <div class="panel">
       <h2 class="section">最終能力値</h2>
@@ -1054,7 +1107,7 @@ function renderEnding(){
       <p style="font-size:13px;line-height:1.9;color:#33483c">${desc}</p>
     </div>
     <button class="btn" id="againBtn">新しい才能を育てる ▶</button>
-    <p class="hint">同じ性格でも、かける言葉で結末は変わる。<br>次はどんなエースを育てる？</p>
+    <p class="hint">同じ性格でも、かける言葉で結末は変わる。<br>次はどこまで登りつめる？</p>
     <div class="footer">Thank you for playing — Football Soul</div>
   `;
   $("#againBtn").onclick = ()=>{ G=null; render(); };
