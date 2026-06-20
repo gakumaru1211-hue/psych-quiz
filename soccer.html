@@ -100,8 +100,26 @@
   .mg.stress .bar>i{background:linear-gradient(90deg,#ffb38a,#ff5d3c);}
 
   .multiplier{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;
-    font-size:12px;font-weight:800;color:#2a6b43;background:#eafaf0;border-radius:12px;padding:9px;}
+    font-size:12px;font-weight:800;color:#2a6b43;background:#eafaf0;border-radius:12px;padding:9px;cursor:pointer;}
   .multiplier b{font-size:18px;color:#159a52;}
+  .multiplier .q{margin-left:auto;width:18px;height:18px;border-radius:50%;background:#37d67a;color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px;}
+
+  /* 選手の本音バブル */
+  .bubble{display:flex;gap:10px;align-items:flex-start;background:linear-gradient(135deg,#fff6e0,#fff);
+    border:2px dashed #ffd98a;border-radius:14px;padding:11px 13px;margin-bottom:12px;}
+  .bubble .av{font-size:26px;flex:0 0 auto;}
+  .bubble .bd{flex:1;min-width:0;}
+  .bubble .bd .lbl{font-size:10px;font-weight:800;color:#c98a00;letter-spacing:.08em;}
+  .bubble .bd .msg{font-size:13.5px;font-weight:700;color:#5a4a1e;margin-top:2px;line-height:1.5;}
+
+  /* 予想プレビュー */
+  .preview{background:#0d1f16;color:#cdeed8;border-radius:12px;padding:11px 13px;margin:10px 0 0;font-size:12px;line-height:1.7;}
+  .preview .ttl{font-size:10px;letter-spacing:.1em;color:#8fb6a1;font-weight:800;margin-bottom:4px;}
+  .preview .gain{color:var(--gold);font-weight:800;}
+  .preview .up{color:#74f0a3;font-weight:700;} .preview .dn{color:#ff9b9b;font-weight:700;}
+  .preview .warn{color:#ffd98a;font-weight:800;}
+  .preview .empty{color:#7a9a88;}
 
   /* ====== 選択肢 ====== */
   .choices{display:grid;gap:9px;}
@@ -194,23 +212,26 @@ const POSITIONS = {
   GK:{n:"ゴールキーパー",key:["defense","power","iq"]}
 };
 
-// 性格タイプ：響く「練習/声かけ」が異なる。fitは倍率補正。
+// 性格タイプ。
+//  love/hate … 練習の得意・苦手（練習相性）
+//  crave     … 心が安定している時に"自然と欲しがる"声かけ（=その週の基準ニーズ）
+//  ただし声かけの正解は固定ではなく、毎週の心理状態で動的に変わる（currentNeed参照）
 const PERSONALITIES = {
   genius:{n:"天才肌",e:"✨",desc:"才能は本物。だが飽きっぽく、やる気が落ちやすい。挑戦的な課題で輝く。",
     pot:[78,95], motiDecay:1.6,
-    love:["challenge","dream"], hate:["routine"], stressTough:0.9},
+    love:["challenge"], hate:["routine"], crave:"dream", stressTough:0.9},
   hard:{n:"努力家",e:"🔥",desc:"コツコツ型。褒められ、認められると伸びる。安定して成長する。",
     pot:[66,84], motiDecay:0.7,
-    love:["praise","together"], hate:[], stressTough:1.05},
+    love:["routine"], hate:[], crave:"praise", stressTough:1.05},
   rival:{n:"負けず嫌い",e:"⚔️",desc:"ライバルや厳しさを力に変える。甘やかすと腐る。",
     pot:[70,90], motiDecay:1.0,
-    love:["push","challenge"], hate:["rest"], stressTough:1.15},
+    love:["challenge"], hate:["rest"], crave:"push", stressTough:1.15},
   glass:{n:"繊細な天才",e:"🌙",desc:"感受性が強く伸びしろ抜群。だが心が折れやすい。言葉選びが命。",
     pot:[80,98], motiDecay:1.2,
-    love:["praise","together","dream"], hate:["push"], stressTough:0.7},
+    love:["routine"], hate:["challenge"], crave:"together", stressTough:0.7},
   mood:{n:"ムードメーカー",e:"🎉",desc:"仲間想いで絆が育ちやすい。みんなと笑うと力が出る。",
     pot:[64,82], motiDecay:0.85,
-    love:["together","dream"], hate:["push"], stressTough:1.1},
+    love:["routine"], hate:[], crave:"together", stressTough:1.1},
 };
 
 // 練習メニュー：targetへ成長。typeは声かけ相性判定にも使う。
@@ -289,11 +310,43 @@ function mentalMultiplier(){
   const m=G.mentals;
   const tough = PERSONALITIES[G.pers].stressTough;
   const mul =
-    (0.55 + 0.45*(m.moti/100)) *
-    (0.70 + 0.30*(m.conf/100)) *
-    (0.70 + 0.30*(m.focus/100)) *
+    (0.70 + 0.50*(m.moti/100)) *
+    (0.80 + 0.35*(m.conf/100)) *
+    (0.80 + 0.35*(m.focus/100)) *
     (1 - 0.45*(m.stress/100)/tough);
-  return Math.max(0.2, mul);
+  return Math.max(0.2, mul);   // 不調≈0.2 / 平凡≈0.9 / 絶好調≈1.5
+}
+
+/* その週に選手が"いちばん欲しがっている声かけ" ---------------------------
+   状態で動的に変わる。困っているメンタルを最優先で埋めようとする＝
+   毎週、刺さる声かけが入れ替わる（性格固定ではない）。               */
+function currentNeed(){
+  const m=G.mentals;
+  if(m.stress>=60) return "rest";     // 疲れ切っている → 休ませてほしい
+  if(m.conf<=42)   return "praise";   // 自信喪失 → 認めてほしい
+  if(m.moti<=44)   return "dream";    // 気持ちが乗らない → 目的を思い出したい
+  if(m.focus<=44)  return "push";     // 緩んでいる → 引き締めてほしい
+  if(m.stress>=42) return "together"; // 少し溜まってきた → 寄り添ってほしい
+  return PERSONALITIES[G.pers].crave; // 安定時は性格ごとの"好み"
+}
+const NEED_BUBBLE = {
+  rest:    "正直、ちょっと疲れが溜まってます…",
+  praise:  "俺なんて、まだまだですよね…",
+  dream:   "なんのために頑張ってるんだっけ、って思う日があって。",
+  push:    "気が緩んでる自覚、あるんです。",
+  together:"最近どう動けばいいか、ひとりだと迷っちゃって。",
+};
+const NEED_GOOD = {
+  genius:"今すごく調子いいです！もっと難しいこと、やりたい。",
+  hard:  "やれるだけやります。見ててください！",
+  rival: "次の相手、絶対に負けたくないっす。",
+  glass: "…なんか今日は、落ち着いてやれそうな気がします。",
+  mood:  "みんなと練習するの、やっぱ楽しいっす！",
+};
+function needBubble(){
+  const n=G.curNeed;
+  if(NEED_BUBBLE[n]) return NEED_BUBBLE[n];
+  return NEED_GOOD[G.pers] || "今日も頑張ります！";
 }
 
 function pushLog(html){ G.log.unshift(html); if(G.log.length>40) G.log.pop(); }
@@ -318,7 +371,8 @@ function renderTitle(){
       キミは天才の卵を見出した <b>相棒トレーナー</b>。<br>
       この世界では <b>「心理」こそが才能の蛇口</b>。<br>
       やる気・自信・集中が高く、ストレスが低いほど、同じ練習でも成長が何倍にもなる。<br>
-      性格によって <b>響く言葉</b> は違う。練習以上に「どう声をかけるか」がエースを生む――。
+      しかも <b>響く言葉は毎週変わる</b>。選手の本音を読み、その時必要な一言を。<br>
+      練習以上に「どう声をかけるか」がエースを生む――。
     </div>
     <div class="panel">
       <h2 class="section">選手をスカウトする</h2>
@@ -369,16 +423,16 @@ function renderWeek(){
   const P = PERSONALITIES[G.pers];
   const weeksToMatch = G.nextMatchWeek - G.week;
   const mul = mentalMultiplier();
-  const mulPct = round(mul*100);
   const mulColor = mul>=1 ? "#159a52" : mul>=0.7 ? "#d8a200" : "#d6433c";
+  G.curNeed = currentNeed();
 
   app.innerHTML = `
     <div class="topbar">
       <div class="logo">FOOTBALL SOUL<small>ココロで育てる育成譚</small></div>
       <div class="meta">
+        <span class="pill" id="helpPill" style="cursor:pointer">❔遊び方</span>
         <span class="pill">${G.season}季</span>
         <span class="pill">第${G.week}週</span>
-        <span class="pill">⚽${G.goals}</span>
       </div>
     </div>
 
@@ -420,8 +474,14 @@ function renderWeek(){
         ${mentalGauge("focus","🎯 集中","focus")}
         ${mentalGauge("stress","💢 ストレス","stress")}
       </div>
-      <div class="multiplier">成長倍率 <b style="color:${mulColor}">×${(mul).toFixed(2)}</b>
-        <span style="opacity:.7;font-weight:600">心が整うほど才能が伸びる</span></div>
+      <div class="multiplier" id="mulInfo">成長倍率 <b style="color:${mulColor}">×${(mul).toFixed(2)}</b>
+        <span style="opacity:.7;font-weight:600">心が整うほど伸びる</span><span class="q">?</span></div>
+    </div>
+
+    <div class="bubble">
+      <div class="av">${P.e}💬</div>
+      <div class="bd"><div class="lbl">${G.name}の今の本音</div>
+        <div class="msg">「${needBubble()}」</div></div>
     </div>
 
     <div class="panel">
@@ -431,7 +491,7 @@ function renderWeek(){
           const fit = trainingFit(t);
           return `<button class="choice ${G.selTraining===t.id?'sel':''}" data-tr="${t.id}">
             <div class="ico">${t.e}</div>
-            <div class="tx"><div class="h">${t.n} ${fit==='good'?'<span class="tag" style="background:#eafaf0;color:#159a52">相性◎</span>':fit==='bad'?'<span class="tag" style="background:#ffeef0;color:#d6433c">苦手</span>':''}</div>
+            <div class="tx"><div class="h">${t.n} ${fit==='good'?'<span class="tag" style="background:#eafaf0;color:#159a52">得意◎</span>':fit==='bad'?'<span class="tag" style="background:#ffeef0;color:#d6433c">苦手</span>':''}</div>
               <div class="d">${t.d}</div></div>
           </button>`;
         }).join("")}
@@ -440,19 +500,21 @@ function renderWeek(){
 
     <div class="panel">
       <h2 class="section">② どんな声をかける？</h2>
+      <p class="hint" style="margin:-4px 0 10px;text-align:left">本音を読んで、いま必要な言葉を選ぼう。<span style="color:#c98a00;font-weight:800">いま響く♥</span>に合わせると効果UP。</p>
       <div class="choices" id="tkChoices">
         ${TALKS.map(t=>{
-          const fit = talkFit(t);
+          const h = talkHint(t);
           return `<button class="choice ${G.selTalk===t.id?'sel':''}" data-tk="${t.id}">
             <div class="ico">${t.e}</div>
-            <div class="tx"><div class="h">${t.n} ${fit==='love'?'<span class="tag" style="background:#fff3d6;color:#c98a00">刺さる♥</span>':fit==='hate'?'<span class="tag" style="background:#ffeef0;color:#d6433c">逆効果</span>':''}</div>
+            <div class="tx"><div class="h">${t.n} ${h?`<span class="tag" style="background:${h.bg};color:${h.c}">${h.t}</span>`:''}</div>
               <div class="d">${t.d}</div></div>
           </button>`;
         }).join("")}
       </div>
     </div>
 
-    <button class="btn alt" id="goBtn">この一週間を過ごす ▶</button>
+    <div id="previewBox"></div>
+    <button class="btn alt" id="goBtn" style="margin-top:10px">この一週間を過ごす ▶</button>
 
     <div class="panel" style="margin-top:12px">
       <h2 class="section">トレーニング日誌</h2>
@@ -464,27 +526,133 @@ function renderWeek(){
   $("#trChoices").querySelectorAll("[data-tr]").forEach(b=> b.onclick=()=>{
     G.selTraining=b.dataset.tr;
     $("#trChoices").querySelectorAll(".choice").forEach(x=>x.classList.remove("sel"));
-    b.classList.add("sel");
+    b.classList.add("sel"); refreshPreview();
   });
   $("#tkChoices").querySelectorAll("[data-tk]").forEach(b=> b.onclick=()=>{
     G.selTalk=b.dataset.tk;
     $("#tkChoices").querySelectorAll(".choice").forEach(x=>x.classList.remove("sel"));
-    b.classList.add("sel");
+    b.classList.add("sel"); refreshPreview();
   });
   $("#goBtn").onclick = advanceWeek;
+  $("#helpPill").onclick = showHelp;
+  $("#mulInfo").onclick = showHelp;
+  refreshPreview();
 }
 
-/* 相性表示 */
+/* 声かけのヒント（その週の状態で動的に変化） */
+function talkHint(t){
+  const m=G.mentals;
+  if(t.type==="push" && m.stress>=64) return {t:"逆効果かも",bg:"#ffeef0",c:"#d6433c"};
+  if(t.type==="rest" && m.stress<=22) return {t:"今は不要",bg:"#eef1f5",c:"#7a8a99"};
+  if(t.type===G.curNeed) return {t:"いま響く♥",bg:"#fff3d6",c:"#c98a00"};
+  return null;
+}
+
+/* 声かけの結果を一元計算（プレビューと実処理で共通利用） */
+function talkOutcome(talk){
+  const m=G.mentals, P=PERSONALITIES[G.pers], need=G.curNeed;
+  let factor=1, backfire=false, matched=false, waste=false;
+  if(talk.type==="push" && m.stress>=64){ backfire=true; }
+  else {
+    if(talk.type===need){ matched=true; factor=1.5; }
+    if(P.crave===talk.type){ factor+=0.15; }
+    if(talk.type==="rest" && m.stress<=22){ waste=true; factor=0.4; }
+  }
+  let d;
+  if(backfire){ d={moti:-6,conf:-8,focus:4,stress:16}; }
+  else {
+    const e=talk.eff;
+    d={ moti:e.moti*factor, conf:e.conf*factor, focus:e.focus*factor,
+        stress:e.stress*(factor>1?0.7:1) };
+  }
+  return {d, factor, backfire, matched, waste, bond:(talk.bond||0)*(matched?1.6:1)};
+}
+
+/* 今週の概算成長量（randomは中央値で固定計算） */
+function estimateGrowth(train, matched){
+  const P=PERSONALITIES[G.pers];
+  if(train.target==="_rest") return [];
+  let trainMul=1;
+  if(P.love.includes(train.type)) trainMul=1.25;
+  if(P.hate.includes(train.type)) trainMul=0.75;
+  const fitMul=0.6+0.4*(G.fitness/100);
+  const mul=mentalMultiplier();
+  const respond = matched?1.12:1;
+  const keys = train.target==="_random" ? null : [train.target];
+  const calc = tk=>{
+    const head=clamp((G.potential-G.stats[tk])/G.potential,0,1);
+    let g=2.5*mul*trainMul*fitMul*(0.35+0.65*head)*respond;
+    if(G.awaken) g*=1.4;
+    return Math.max(0.2,g);
+  };
+  if(!keys) return [{k:"?",amt:2.5*mul*trainMul*fitMul*respond}]; // 自主練=ランダム
+  if(train.id==="iq" && G.selTalk==="together") return [{k:"iq",amt:calc("iq")*1.6}];
+  return keys.map(tk=>({k:tk,amt:calc(tk)}));
+}
+
+function refreshPreview(){
+  const box=$("#previewBox"); if(!box) return;
+  if(!G.selTraining && !G.selTalk){
+    box.innerHTML = `<div class="preview"><div class="ttl">▶ 予想される一週間</div>
+      <span class="empty">練習と声かけを選ぶと、ここに結果の予想が出ます。</span></div>`;
+    return;
+  }
+  const train = TRAININGS.find(x=>x.id===G.selTraining);
+  const talk  = TALKS.find(x=>x.id===G.selTalk);
+  let gh="", mh="", note="";
+  if(talk){
+    const o=talkOutcome(talk);
+    if(o.backfire) note=`<span class="warn">⚠ ストレス過多。厳しい言葉は逆効果になりそう。</span>`;
+    else if(o.waste) note=`<span class="warn">余裕あり。休ませる必要はなさそう。</span>`;
+    else if(o.matched) note=`<span class="up">♥ 今いちばん欲しい言葉。深く響く！</span>`;
+    const parts=[];
+    [["moti","やる気"],["conf","自信"],["focus","集中"],["stress","ストレス"]].forEach(([k,n])=>{
+      const v=o.d[k]; if(Math.abs(v)<0.5) return;
+      const good = (k==="stress") ? v<0 : v>0;
+      parts.push(`<span class="${good?'up':'dn'}">${n}${v>0?'+':''}${round(v)}</span>`);
+    });
+    mh = parts.join(" / ");
+  }
+  if(train){
+    const matched = talk ? talkOutcome(talk).matched : false;
+    const gs=estimateGrowth(train, matched);
+    if(train.target==="_rest") gh=`<span class="up">🛌 コンディション回復・ストレス大幅減</span>`;
+    else if(gs.length && gs[0].k==="?") gh=`<span class="gain">⁇ ランダムな能力が ≈+${gs[0].amt.toFixed(1)} ×2か所（高負荷）</span>`;
+    else gh = gs.map(g=>`<span class="gain">${STAT_INFO[g.k].e}${STAT_INFO[g.k].n} ≈+${g.amt.toFixed(1)}</span>`).join(" / ");
+  }
+  box.innerHTML = `<div class="preview"><div class="ttl">▶ 予想される一週間</div>
+    ${gh?`<div>📈 成長：${gh}</div>`:''}
+    ${mh?`<div>🧠 心理：${mh}</div>`:''}
+    ${note?`<div>${note}</div>`:''}
+    ${!gh&&!mh?'<span class="empty">もう片方も選ぶと全体が見えます。</span>':''}
+  </div>`;
+}
+
+function showHelp(){
+  showModal("📘","遊び方 — 攻略のコツ",
+    `<div style="text-align:left;font-size:12.5px;line-height:1.8">
+     <b>① 心理 = 成長の倍率</b><br>
+     やる気・自信・集中が高く、ストレスが低いほど、同じ練習でも成長量が
+     <b>×0.2〜×1.5以上</b>に変化。まず心を整えるのが最優先。<br><br>
+     <b>② 声かけの正解は毎週変わる</b><br>
+     選手は毎週ちがう本音を漏らす。その<b>本音に合った声かけ</b>＝
+     <span style="color:#c98a00;font-weight:800">「いま響く♥」</span>を選ぶと効果が1.5倍になり、絆も深まる。<br>
+     ・自信がない→褒める／気が乗らない→夢を語る<br>
+     ・緩んでる→厳しく要求／疲れてる→休もう／迷ってる→一緒に考える<br><br>
+     <b>③ やってはいけない</b><br>
+     ストレスが高い時の<span style="color:#d6433c;font-weight:800">「厳しく要求」は逆効果</span>。
+     放置するとスランプ・ケガに。<br><br>
+     <b>④ 流れ</b><br>
+     練習でストレスは溜まる→声かけ＆休養でケア→心を整えて伸ばす→4週ごとの試合で成長を試す。
+     <b>覚醒(ゾーン)</b>に入れば成長が加速！</div>`,
+    [{t:"わかった！",cls:"btn",fn:closeModal}]);
+}
+
+/* 練習相性表示 */
 function trainingFit(t){
   const P=PERSONALITIES[G.pers];
   if(P.love.includes(t.type)) return 'good';
   if(P.hate.includes(t.type)) return 'bad';
-  return '';
-}
-function talkFit(t){
-  const P=PERSONALITIES[G.pers];
-  if(P.love.includes(t.type)) return 'love';
-  if(P.hate.includes(t.type)) return 'hate';
   return '';
 }
 
@@ -500,25 +668,18 @@ function advanceWeek(){
   const train = TRAININGS.find(x=>x.id===G.selTraining);
   pushLog(`<span class="sys">▼ 第${G.season}-${G.week}週</span>`);
 
-  /* --- 声かけ（メンタル変化） --- */
-  let talkMul = 1;
-  if(P.love.includes(talk.type)) talkMul = 1.5;
-  if(P.hate.includes(talk.type)) talkMul = -0.6; // 逆効果
-  const e = talk.eff;
-  if(talkMul<0){
-    // 逆効果：ストレス増・やる気減
-    G.mentals.moti = clamp(G.mentals.moti - 6);
-    G.mentals.conf = clamp(G.mentals.conf - 5);
-    G.mentals.stress = clamp(G.mentals.stress + 12);
-    pushLog(`💬「${talk.n}」… <span class="bad">${G.name}には響かなかったみたいだ。</span>`);
-  }else{
-    G.mentals.moti  = clamp(G.mentals.moti  + e.moti*talkMul);
-    G.mentals.conf  = clamp(G.mentals.conf  + e.conf*talkMul);
-    G.mentals.focus = clamp(G.mentals.focus + e.focus*talkMul);
-    G.mentals.stress= clamp(G.mentals.stress+ e.stress*(talkMul>1?0.7:1)); // 刺さる時はストレス増を緩和
-    G.bond = clamp(G.bond + (talk.bond||0)*(talkMul>1?1.5:1), 0, 100);
-    pushLog(`💬「${talk.n}」 ${talkMul>1?'<span class="good">想いが深く届いた！</span>':''}`);
-  }
+  /* --- 声かけ（メンタル変化）：その週のニーズで効果が動的に変わる --- */
+  const o = talkOutcome(talk);
+  G.mentals.moti  = clamp(G.mentals.moti  + o.d.moti);
+  G.mentals.conf  = clamp(G.mentals.conf  + o.d.conf);
+  G.mentals.focus = clamp(G.mentals.focus + o.d.focus);
+  G.mentals.stress= clamp(G.mentals.stress+ o.d.stress);
+  G.bond = clamp(G.bond + o.bond, 0, 100);
+  G.responded = o.matched; // 心が満たされた週は練習の吸収UP
+  if(o.backfire) pushLog(`💬「${talk.n}」… <span class="bad">ストレスが限界の${G.name}には逆効果だった。</span>`);
+  else if(o.matched) pushLog(`💬「${talk.n}」 <span class="good">今いちばん欲しい言葉だった。深く届いた！</span>`);
+  else if(o.waste) pushLog(`💬「${talk.n}」 <span class="sys">…まあ、悪くはないか。</span>`);
+  else pushLog(`💬「${talk.n}」`);
 
   /* --- 練習（ステータス成長） --- */
   const mul = mentalMultiplier();
@@ -551,10 +712,11 @@ function advanceWeek(){
         if(train.id==="iq" && talk.iqBonus) targets.push("iq");
       }
       const room = ()=> 1; // 伸びしろ概念は cap で表現
+      const respond = G.responded ? 1.12 : 1; // 声かけが刺さった週は吸収UP
       targets.forEach(tk=>{
         const cur = G.stats[tk];
         const headroom = clamp((G.potential - cur)/G.potential, 0, 1); // capに近いほど伸びにくい
-        let gain = rnd(2.2,3.6) * mul * trainMul * fitMul * (0.35 + 0.65*headroom);
+        let gain = rnd(1.9,3.1) * mul * trainMul * fitMul * (0.35 + 0.65*headroom) * respond;
         if(G.awaken) gain *= 1.4;
         gain = Math.max(0.2, gain);
         G.stats[tk] = clamp(cur + gain, 0, G.potential);
