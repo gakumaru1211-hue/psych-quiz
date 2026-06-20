@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>フットボール・ソウル ～ココロで育てるサッカー育成譚～</title>
+<style>
+  :root{
+    --pitch:#1f7a3d; --pitch2:#15622f; --line:#bdeacb;
+    --ink:#0e1a14; --paper:#f4fbf6; --gold:#ffcf4d; --accent:#37d67a;
+    --danger:#ff5d6c; --stress:#ff7a45; --moti:#ffd23f; --conf:#37b6ff; --focus:#a472ff;
+    --card:#ffffff; --shadow:0 10px 30px rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 50% -10%, #2a9b53 0%, var(--pitch) 45%, var(--pitch2) 100%) fixed;
+    min-height:100vh; -webkit-text-size-adjust:100%;
+  }
+  #app{max-width:520px;margin:0 auto;padding:14px 14px 60px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;color:#eafff1;margin-bottom:10px;}
+  .topbar .logo{font-weight:800;letter-spacing:.04em;font-size:15px;text-shadow:0 2px 6px rgba(0,0,0,.35);}
+  .topbar .logo small{display:block;font-weight:600;font-size:10px;opacity:.85;letter-spacing:.12em;}
+  .meta{display:flex;gap:8px;}
+  .pill{background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.18);color:#eafff1;
+    padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700;backdrop-filter:blur(4px);}
+  .panel{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:16px;margin-bottom:12px;}
+  h2.section{font-size:13px;margin:2px 0 12px;letter-spacing:.06em;color:#2a6b43;
+    display:flex;align-items:center;gap:7px;}
+  h2.section::before{content:"";width:4px;height:15px;border-radius:3px;background:var(--accent);}
+
+  /* ====== タイトル ====== */
+  .title-hero{text-align:center;color:#fff;padding:24px 6px 6px;}
+  .title-hero .ball{font-size:62px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.4));animation:floaty 3s ease-in-out infinite;}
+  @keyframes floaty{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-12px) rotate(6deg)}}
+  .title-hero h1{font-size:27px;margin:6px 0 2px;text-shadow:0 4px 14px rgba(0,0,0,.45);letter-spacing:.02em;}
+  .title-hero p{opacity:.92;font-size:12.5px;line-height:1.7;margin:8px 16px 0;}
+  .concept{background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.2);border-radius:14px;
+    padding:12px 14px;margin:16px 4px;color:#eafff1;font-size:12px;line-height:1.8;text-align:left;}
+  .concept b{color:var(--gold);}
+
+  /* ====== ボタン ====== */
+  .btn{display:block;width:100%;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:800;
+    color:#0e1a14;background:linear-gradient(135deg,var(--gold),#ffb800);cursor:pointer;
+    box-shadow:0 6px 0 #c98a00,0 10px 20px rgba(0,0,0,.25);transition:transform .05s, box-shadow .05s;
+    letter-spacing:.04em;}
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c98a00,0 6px 12px rgba(0,0,0,.25);}
+  .btn.alt{background:linear-gradient(135deg,#3de07f,#19b45e);color:#04331b;box-shadow:0 6px 0 #0d8c45,0 10px 20px rgba(0,0,0,.25);}
+  .btn.alt:active{box-shadow:0 2px 0 #0d8c45,0 6px 12px rgba(0,0,0,.25);}
+  .btn.ghost{background:#eef5f0;color:#2a6b43;box-shadow:0 4px 0 #c5d8cc;}
+  .btn.ghost:active{box-shadow:0 1px 0 #c5d8cc;}
+  .btn:disabled{filter:grayscale(.6) opacity(.55);pointer-events:none;}
+
+  .field{margin:10px 0;}
+  .field label{display:block;font-size:12px;font-weight:700;color:#2a6b43;margin-bottom:5px;}
+  .field input,.field select{width:100%;padding:12px;border-radius:12px;border:2px solid #d8e8de;
+    font-size:15px;font-family:inherit;background:#fbfffc;}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--accent);}
+
+  /* ====== 選手カード ====== */
+  .pcard{position:relative;border-radius:18px;overflow:hidden;color:#fff;margin-bottom:12px;
+    background:linear-gradient(160deg,#16324a,#0c1c2b);box-shadow:var(--shadow);}
+  .pcard .shine{position:absolute;inset:0;background:
+    radial-gradient(120% 60% at 80% 0%, rgba(255,255,255,.18), transparent 60%);pointer-events:none;}
+  .pcard .head{display:flex;align-items:center;gap:12px;padding:14px 16px 8px;}
+  .pcard .face{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:34px;background:linear-gradient(135deg,#37d67a,#1f9b57);box-shadow:0 4px 12px rgba(0,0,0,.3);flex:0 0 auto;}
+  .pcard .who{flex:1;min-width:0;}
+  .pcard .who .nm{font-size:18px;font-weight:800;}
+  .pcard .who .sub{font-size:11px;opacity:.85;margin-top:2px;}
+  .pcard .ovr{text-align:center;flex:0 0 auto;}
+  .pcard .ovr b{font-size:30px;font-weight:900;line-height:1;color:var(--gold);}
+  .pcard .ovr span{display:block;font-size:9px;opacity:.8;letter-spacing:.18em;}
+  .ptags{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px;}
+  .ptag{font-size:10.5px;font-weight:700;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);
+    padding:4px 9px;border-radius:999px;}
+  .ptag.gold{background:rgba(255,207,77,.22);border-color:rgba(255,207,77,.5);color:#ffe49b;}
+
+  /* ====== ステータスバー ====== */
+  .stat{margin-bottom:9px;}
+  .stat .row{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-bottom:3px;color:#2c4a39;}
+  .stat .row .v{font-variant-numeric:tabular-nums;}
+  .bar{height:9px;border-radius:6px;background:#e6efe9;overflow:hidden;}
+  .bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#37d67a,#1f9b57);
+    transition:width .6s cubic-bezier(.2,.8,.2,1);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
+
+  /* ====== メンタルゲージ ====== */
+  .mentals{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .mg{background:#f6faf7;border-radius:12px;padding:9px 11px;}
+  .mg .t{font-size:11px;font-weight:800;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .mg .t em{font-style:normal;font-size:13px;font-variant-numeric:tabular-nums;}
+  .mg .bar{height:7px;}
+  .mg.moti .bar>i{background:linear-gradient(90deg,#ffe16a,#ffb300);}
+  .mg.conf .bar>i{background:linear-gradient(90deg,#7cd4ff,#1f8fff);}
+  .mg.focus .bar>i{background:linear-gradient(90deg,#c7a8ff,#7a3cff);}
+  .mg.stress .bar>i{background:linear-gradient(90deg,#ffb38a,#ff5d3c);}
+
+  .multiplier{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;
+    font-size:12px;font-weight:800;color:#2a6b43;background:#eafaf0;border-radius:12px;padding:9px;}
+  .multiplier b{font-size:18px;color:#159a52;}
+
+  /* ====== 選択肢 ====== */
+  .choices{display:grid;gap:9px;}
+  .choice{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:2px solid #e3eee8;
+    background:#fff;border-radius:14px;padding:12px;cursor:pointer;transition:.12s;font-family:inherit;}
+  .choice:active{transform:scale(.98);}
+  .choice.sel{border-color:var(--accent);background:#effaf2;box-shadow:0 0 0 3px rgba(55,214,122,.18);}
+  .choice .ico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;background:#eef5f0;flex:0 0 auto;}
+  .choice .tx{flex:1;min-width:0;}
+  .choice .tx .h{font-size:14px;font-weight:800;}
+  .choice .tx .d{font-size:11px;color:#5a6f63;margin-top:2px;line-height:1.4;}
+  .choice .tag{font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:#eef5f0;color:#3a7a55;}
+
+  /* ====== ログ / 実況 ====== */
+  .log{background:#0d1f16;color:#cdeed8;border-radius:14px;padding:12px 14px;font-size:12.5px;line-height:1.7;
+    max-height:230px;overflow-y:auto;}
+  .log p{margin:0 0 7px;}
+  .log .gain{color:var(--gold);font-weight:800;}
+  .log .good{color:#74f0a3;font-weight:700;}
+  .log .bad{color:#ff9b9b;font-weight:700;}
+  .log .ev{color:#ffd98a;font-weight:800;}
+  .log .sys{color:#8fb6a1;}
+
+  /* 試合実況 */
+  .matchscene{text-align:center;color:#fff;}
+  .scoreboard{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 12px;
+    background:linear-gradient(135deg,#0c1c2b,#16324a);border-radius:14px;padding:14px;box-shadow:var(--shadow);}
+  .scoreboard .tm{flex:1;font-size:13px;font-weight:800;}
+  .scoreboard .sc{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;}
+  .scoreboard .sc small{font-size:13px;opacity:.6;}
+
+  /* トースト */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(40px);
+    background:#0d1f16;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:700;
+    box-shadow:var(--shadow);opacity:0;transition:.3s;z-index:50;pointer-events:none;max-width:90%;text-align:center;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* イベントモーダル */
+  #modal{position:fixed;inset:0;background:rgba(6,18,12,.66);display:none;align-items:center;justify-content:center;
+    padding:20px;z-index:40;backdrop-filter:blur(3px);}
+  #modal.show{display:flex;}
+  .modalcard{background:var(--card);border-radius:20px;max-width:440px;width:100%;padding:20px;box-shadow:var(--shadow);
+    animation:pop .3s cubic-bezier(.2,1.2,.4,1);}
+  @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+  .modalcard .ev-ico{font-size:46px;text-align:center;}
+  .modalcard h3{text-align:center;margin:6px 0 8px;font-size:18px;}
+  .modalcard .ev-txt{font-size:13px;line-height:1.8;color:#33483c;margin-bottom:14px;text-align:center;}
+
+  .hint{font-size:11px;color:#5a6f63;line-height:1.6;margin-top:8px;text-align:center;}
+  .footer{text-align:center;color:rgba(255,255,255,.55);font-size:10.5px;margin-top:14px;letter-spacing:.05em;}
+  .center{text-align:center;}
+  .divline{height:1px;background:#e6efe9;margin:14px 0;}
+  .seasonbadge{display:inline-block;background:#eafaf0;color:#159a52;font-weight:800;font-size:11px;
+    padding:3px 10px;border-radius:999px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<div id="modal"><div class="modalcard" id="modalcard"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   フットボール・ソウル ～ココロで育てるサッカー育成譚～
+   選手の「心理」がすべての成長量の倍率になる、新しいサッカー育成ゲーム。
+   ========================================================================= */
+
+const $ = sel => document.querySelector(sel);
+const app = $("#app");
+const rnd = (a,b)=> a + Math.random()*(b-a);
+const irnd = (a,b)=> Math.floor(rnd(a,b+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const clamp = (v,a=0,b=100)=> Math.max(a,Math.min(b,v));
+const round = v => Math.round(v);
+
+/* ---- データ定義 ---------------------------------------------------------- */
+const STAT_KEYS = ["speed","power","tech","pass","shoot","defense","iq"];
+const STAT_INFO = {
+  speed:{n:"スピード",e:"⚡"}, power:{n:"フィジカル",e:"💪"}, tech:{n:"テクニック",e:"🎯"},
+  pass:{n:"パス",e:"🅿️"}, shoot:{n:"シュート",e:"🥅"}, defense:{n:"ディフェンス",e:"🛡️"},
+  iq:{n:"戦術IQ",e:"🧠"}
+};
+
+const POSITIONS = {
+  FW:{n:"フォワード",key:["shoot","speed","tech"]},
+  MF:{n:"ミッドフィルダー",key:["pass","iq","tech"]},
+  DF:{n:"ディフェンダー",key:["defense","power","iq"]},
+  GK:{n:"ゴールキーパー",key:["defense","power","iq"]}
+};
+
+// 性格タイプ：響く「練習/声かけ」が異なる。fitは倍率補正。
+const PERSONALITIES = {
+  genius:{n:"天才肌",e:"✨",desc:"才能は本物。だが飽きっぽく、やる気が落ちやすい。挑戦的な課題で輝く。",
+    pot:[78,95], motiDecay:1.6,
+    love:["challenge","dream"], hate:["routine"], stressTough:0.9},
+  hard:{n:"努力家",e:"🔥",desc:"コツコツ型。褒められ、認められると伸びる。安定して成長する。",
+    pot:[66,84], motiDecay:0.7,
+    love:["praise","together"], hate:[], stressTough:1.05},
+  rival:{n:"負けず嫌い",e:"⚔️",desc:"ライバルや厳しさを力に変える。甘やかすと腐る。",
+    pot:[70,90], motiDecay:1.0,
+    love:["push","challenge"], hate:["rest"], stressTough:1.15},
+  glass:{n:"繊細な天才",e:"🌙",desc:"感受性が強く伸びしろ抜群。だが心が折れやすい。言葉選びが命。",
+    pot:[80,98], motiDecay:1.2,
+    love:["praise","together","dream"], hate:["push"], stressTough:0.7},
+  mood:{n:"ムードメーカー",e:"🎉",desc:"仲間想いで絆が育ちやすい。みんなと笑うと力が出る。",
+    pot:[64,82], motiDecay:0.85,
+    love:["together","dream"], hate:["push"], stressTough:1.1},
+};
+
+// 練習メニュー：targetへ成長。typeは声かけ相性判定にも使う。
+const TRAININGS = [
+  {id:"speed",  e:"⚡", n:"スピード練習",   d:"瞬発力とトップスピードを磨く", target:"speed",  type:"routine", stress:9},
+  {id:"power",  e:"💪", n:"フィジカル強化", d:"体幹と当たり負けしない体に",   target:"power",  type:"routine", stress:11},
+  {id:"tech",   e:"🎯", n:"基礎技術",       d:"トラップとボールタッチを反復", target:"tech",   type:"routine", stress:8},
+  {id:"pass",   e:"🅿️", n:"パス練習",       d:"視野と展開力を養う",           target:"pass",   type:"routine", stress:7},
+  {id:"shoot",  e:"🥅", n:"シュート練習",   d:"決定力をひたすら磨く",         target:"shoot",  type:"routine", stress:9},
+  {id:"defense",e:"🛡️", n:"守備練習",       d:"対人と読みを鍛える",           target:"defense",type:"routine", stress:9},
+  {id:"iq",     e:"🧠", n:"戦術ミーティング",d:"頭でサッカーを理解する",       target:"iq",     type:"challenge",stress:6},
+  {id:"selfA",  e:"🌀", n:"自主練（猛特訓）",d:"高負荷。大きく伸びるが消耗大", target:"_random",type:"challenge",stress:20},
+  {id:"rest",   e:"🛌", n:"休養日",         d:"心と体を回復させる",           target:"_rest",  type:"rest",     stress:-26},
+];
+
+// 声かけ：メンタルを動かす。type が性格の love/hate に当たると効果増減。
+const TALKS = [
+  {id:"praise",   e:"😊", n:"思いきり褒める",  d:"自信とやる気を引き上げる",      type:"praise",
+    eff:{moti:9, conf:13, focus:0, stress:-6}, bond:2},
+  {id:"push",     e:"😤", n:"厳しく要求する",  d:"集中を高めるが負担も大きい",    type:"push",
+    eff:{moti:6, conf:-3, focus:14, stress:14}, bond:0},
+  {id:"together", e:"🤝", n:"一緒に考える",    d:"対話で戦術IQと絆を育てる",      type:"together",
+    eff:{moti:6, conf:6, focus:9, stress:-3}, bond:3, iqBonus:0.6},
+  {id:"dream",    e:"🌟", n:"夢を語り合う",    d:"モチベーションを爆発させる",    type:"dream",
+    eff:{moti:18, conf:5, focus:-2, stress:-2}, bond:2},
+  {id:"rest",     e:"☕", n:"今日は休もう",    d:"ストレスを大きく癒やす",        type:"rest",
+    eff:{moti:-4, conf:2, focus:0, stress:-18}, bond:1},
+];
+
+const OPP_NAMES = ["青嵐FC","セント・ロア","紅蓮ユナイテッド","白波SC","黒鉄ガンナーズ","蒼天イレブン",
+  "雷鳴アスレチコ","碧波クラブ","暁ロヴァーズ","隼スポルティング","狼煙FC","海凪マリナーズ"];
+const FIRST = ["ハル","レン","ソラ","カイ","リク","ツバサ","ジン","アサヒ","ユウ","タクミ","ハヤテ","ノア"];
+
+/* ---- ゲーム状態 ---------------------------------------------------------- */
+let G = null;
+function newGame(name, posKey){
+  const pers = pick(Object.keys(PERSONALITIES));
+  const P = PERSONALITIES[pers];
+  const potential = round(rnd(P.pot[0], P.pot[1]));
+  const base = ()=> round(rnd(28,42));
+  const stats = {}; STAT_KEYS.forEach(k=> stats[k]=base());
+  // ポジション主要ステータスを少し底上げ
+  POSITIONS[posKey].key.forEach((k,i)=> stats[k]=clamp(stats[k]+ (10-i*3)));
+  G = {
+    name, pos:posKey, pers, potential,
+    age:15, week:1, season:1, maxSeason:3,
+    stats,
+    mentals:{moti:62, conf:55, focus:55, stress:18},
+    bond:0, fitness:100,
+    matchIdx:0, results:[], goals:0, momCount:0,
+    nextMatchWeek:4, opp:null,
+    awaken:false, injured:0,
+    log:[], pendingEvent:null, over:false,
+    selTraining:null, selTalk:null,
+  };
+  rollOpponent();
+  pushLog(`<span class="sys">— ${name}（${PERSONALITIES[pers].n}）の物語が始まる。次の試合は第4週。—</span>`);
+  return G;
+}
+
+function rollOpponent(){
+  const diff = (G.season-1)*16 + G.matchIdx*3 + irnd(-4,4);
+  G.opp = { name:pick(OPP_NAMES), power: clamp(40+diff, 30, 96) };
+}
+
+function ovr(){
+  // 主要ステータス重視の総合値
+  const key = POSITIONS[G.pos].key;
+  let sum=0,w=0;
+  STAT_KEYS.forEach(k=>{ const wt = key.includes(k)?2:1; sum+=G.stats[k]*wt; w+=wt; });
+  return round(sum/w);
+}
+
+/* 心理倍率：成長量にかかる中核ロジック ---------------------------------- */
+function mentalMultiplier(){
+  const m=G.mentals;
+  const tough = PERSONALITIES[G.pers].stressTough;
+  const mul =
+    (0.55 + 0.45*(m.moti/100)) *
+    (0.70 + 0.30*(m.conf/100)) *
+    (0.70 + 0.30*(m.focus/100)) *
+    (1 - 0.45*(m.stress/100)/tough);
+  return Math.max(0.2, mul);
+}
+
+function pushLog(html){ G.log.unshift(html); if(G.log.length>40) G.log.pop(); }
+
+/* =========================================================================
+   画面描画
+   ========================================================================= */
+function render(){
+  if(!G){ renderTitle(); return; }
+  if(G.over){ renderEnding(); return; }
+  renderWeek();
+}
+
+function renderTitle(){
+  app.innerHTML = `
+    <div class="title-hero">
+      <div class="ball">⚽</div>
+      <h1>フットボール・ソウル</h1>
+      <p>～ ココロで育てるサッカー育成譚 ～</p>
+    </div>
+    <div class="concept">
+      キミは天才の卵を見出した <b>相棒トレーナー</b>。<br>
+      この世界では <b>「心理」こそが才能の蛇口</b>。<br>
+      やる気・自信・集中が高く、ストレスが低いほど、同じ練習でも成長が何倍にもなる。<br>
+      性格によって <b>響く言葉</b> は違う。練習以上に「どう声をかけるか」がエースを生む――。
+    </div>
+    <div class="panel">
+      <h2 class="section">選手をスカウトする</h2>
+      <div class="field">
+        <label>選手の名前</label>
+        <input id="inName" maxlength="8" placeholder="例：ハル" />
+      </div>
+      <div class="field">
+        <label>ポジション</label>
+        <select id="inPos">
+          <option value="FW">FW フォワード（点を取る司令塔）</option>
+          <option value="MF">MF ミッドフィルダー（試合を支配）</option>
+          <option value="DF">DF ディフェンダー（守りの要）</option>
+          <option value="GK">GK ゴールキーパー（最後の砦）</option>
+        </select>
+      </div>
+      <button class="btn" id="startBtn">この選手を育てる ▶</button>
+      <p class="hint">性格タイプはスカウト時にランダムで決まります。<br>3シーズン後、彼はどんな選手になっているか――。</p>
+    </div>
+    <div class="footer">© Football Soul — a mind-driven football raising game</div>
+  `;
+  $("#startBtn").onclick = ()=>{
+    let name = $("#inName").value.trim();
+    if(!name) name = pick(FIRST);
+    newGame(name, $("#inPos").value);
+    render();
+    const P = PERSONALITIES[G.pers];
+    showModal(P.e, `性格タイプ：${P.n}`, P.desc + `<br><br><b>潜在能力 ${G.potential}</b> ―― この才能を、どこまで咲かせられるか。`,
+      [{t:"育成を始める",cls:"btn",fn:closeModal}]);
+  };
+}
+
+function statBar(k){
+  const v=G.stats[k], cap=G.potential;
+  return `<div class="stat">
+    <div class="row"><span>${STAT_INFO[k].e} ${STAT_INFO[k].n}</span><span class="v">${round(v)}</span></div>
+    <div class="bar"><i style="width:${clamp(v/cap*100)}%"></i></div>
+  </div>`;
+}
+
+function mentalGauge(key,label,cls){
+  const v=round(G.mentals[key]);
+  return `<div class="mg ${cls}"><div class="t"><span>${label}</span><em>${v}</em></div>
+    <div class="bar"><i style="width:${clamp(v)}%"></i></div></div>`;
+}
+
+function renderWeek(){
+  const P = PERSONALITIES[G.pers];
+  const weeksToMatch = G.nextMatchWeek - G.week;
+  const mul = mentalMultiplier();
+  const mulPct = round(mul*100);
+  const mulColor = mul>=1 ? "#159a52" : mul>=0.7 ? "#d8a200" : "#d6433c";
+
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="logo">FOOTBALL SOUL<small>ココロで育てる育成譚</small></div>
+      <div class="meta">
+        <span class="pill">${G.season}季</span>
+        <span class="pill">第${G.week}週</span>
+        <span class="pill">⚽${G.goals}</span>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <div class="shine"></div>
+      <div class="head">
+        <div class="face">${P.e}</div>
+        <div class="who">
+          <div class="nm">${G.name}</div>
+          <div class="sub">${G.age}歳 ・ ${G.pos} ${POSITIONS[G.pos].n} ・ ${P.n}</div>
+        </div>
+        <div class="ovr"><b>${ovr()}</b><span>OVR</span></div>
+      </div>
+      <div class="ptags">
+        <span class="ptag gold">潜在 ${G.potential}</span>
+        <span class="ptag">絆 Lv.${Math.floor(G.bond/10)}</span>
+        <span class="ptag">${weeksToMatch<=0?"⚽今週は試合！":`次の試合まで ${weeksToMatch}週`}</span>
+        ${G.awaken?'<span class="ptag gold">✨覚醒中</span>':''}
+        ${G.injured>0?`<span class="ptag" style="background:rgba(255,93,108,.25);border-color:rgba(255,93,108,.5)">🩹離脱 ${G.injured}週</span>`:''}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section">能力値</h2>
+      <div class="grid2">
+        <div>${["speed","power","tech","pass"].map(statBar).join("")}</div>
+        <div>${["shoot","defense","iq"].map(statBar).join("")}
+          <div class="stat"><div class="row"><span>🫀 コンディション</span><span class="v">${round(G.fitness)}</span></div>
+          <div class="bar"><i style="width:${clamp(G.fitness)}%;background:linear-gradient(90deg,#ff9b6a,#ff5d6c)"></i></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section">ココロの状態</h2>
+      <div class="mentals">
+        ${mentalGauge("moti","🔥 やる気","moti")}
+        ${mentalGauge("conf","💙 自信","conf")}
+        ${mentalGauge("focus","🎯 集中","focus")}
+        ${mentalGauge("stress","💢 ストレス","stress")}
+      </div>
+      <div class="multiplier">成長倍率 <b style="color:${mulColor}">×${(mul).toFixed(2)}</b>
+        <span style="opacity:.7;font-weight:600">心が整うほど才能が伸びる</span></div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section">① 今週の練習を選ぶ</h2>
+      <div class="choices" id="trChoices">
+        ${TRAININGS.map(t=>{
+          const fit = trainingFit(t);
+          return `<button class="choice ${G.selTraining===t.id?'sel':''}" data-tr="${t.id}">
+            <div class="ico">${t.e}</div>
+            <div class="tx"><div class="h">${t.n} ${fit==='good'?'<span class="tag" style="background:#eafaf0;color:#159a52">相性◎</span>':fit==='bad'?'<span class="tag" style="background:#ffeef0;color:#d6433c">苦手</span>':''}</div>
+              <div class="d">${t.d}</div></div>
+          </button>`;
+        }).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section">② どんな声をかける？</h2>
+      <div class="choices" id="tkChoices">
+        ${TALKS.map(t=>{
+          const fit = talkFit(t);
+          return `<button class="choice ${G.selTalk===t.id?'sel':''}" data-tk="${t.id}">
+            <div class="ico">${t.e}</div>
+            <div class="tx"><div class="h">${t.n} ${fit==='love'?'<span class="tag" style="background:#fff3d6;color:#c98a00">刺さる♥</span>':fit==='hate'?'<span class="tag" style="background:#ffeef0;color:#d6433c">逆効果</span>':''}</div>
+              <div class="d">${t.d}</div></div>
+          </button>`;
+        }).join("")}
+      </div>
+    </div>
+
+    <button class="btn alt" id="goBtn">この一週間を過ごす ▶</button>
+
+    <div class="panel" style="margin-top:12px">
+      <h2 class="section">トレーニング日誌</h2>
+      <div class="log" id="logBox">${G.log.map(l=>`<p>${l}</p>`).join("")}</div>
+    </div>
+    <div class="footer">心を壊さず、夢の舞台へ。 — Football Soul</div>
+  `;
+
+  $("#trChoices").querySelectorAll("[data-tr]").forEach(b=> b.onclick=()=>{
+    G.selTraining=b.dataset.tr;
+    $("#trChoices").querySelectorAll(".choice").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel");
+  });
+  $("#tkChoices").querySelectorAll("[data-tk]").forEach(b=> b.onclick=()=>{
+    G.selTalk=b.dataset.tk;
+    $("#tkChoices").querySelectorAll(".choice").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel");
+  });
+  $("#goBtn").onclick = advanceWeek;
+}
+
+/* 相性表示 */
+function trainingFit(t){
+  const P=PERSONALITIES[G.pers];
+  if(P.love.includes(t.type)) return 'good';
+  if(P.hate.includes(t.type)) return 'bad';
+  return '';
+}
+function talkFit(t){
+  const P=PERSONALITIES[G.pers];
+  if(P.love.includes(t.type)) return 'love';
+  if(P.hate.includes(t.type)) return 'hate';
+  return '';
+}
+
+/* =========================================================================
+   1週間を進める処理
+   ========================================================================= */
+function advanceWeek(){
+  if(!G.selTraining || !G.selTalk){ toast("練習と声かけを両方えらんでね"); return; }
+  if(G.injured>0){ /* 離脱中は練習不可・回復のみ */ }
+
+  const P = PERSONALITIES[G.pers];
+  const talk = TALKS.find(x=>x.id===G.selTalk);
+  const train = TRAININGS.find(x=>x.id===G.selTraining);
+  pushLog(`<span class="sys">▼ 第${G.season}-${G.week}週</span>`);
+
+  /* --- 声かけ（メンタル変化） --- */
+  let talkMul = 1;
+  if(P.love.includes(talk.type)) talkMul = 1.5;
+  if(P.hate.includes(talk.type)) talkMul = -0.6; // 逆効果
+  const e = talk.eff;
+  if(talkMul<0){
+    // 逆効果：ストレス増・やる気減
+    G.mentals.moti = clamp(G.mentals.moti - 6);
+    G.mentals.conf = clamp(G.mentals.conf - 5);
+    G.mentals.stress = clamp(G.mentals.stress + 12);
+    pushLog(`💬「${talk.n}」… <span class="bad">${G.name}には響かなかったみたいだ。</span>`);
+  }else{
+    G.mentals.moti  = clamp(G.mentals.moti  + e.moti*talkMul);
+    G.mentals.conf  = clamp(G.mentals.conf  + e.conf*talkMul);
+    G.mentals.focus = clamp(G.mentals.focus + e.focus*talkMul);
+    G.mentals.stress= clamp(G.mentals.stress+ e.stress*(talkMul>1?0.7:1)); // 刺さる時はストレス増を緩和
+    G.bond = clamp(G.bond + (talk.bond||0)*(talkMul>1?1.5:1), 0, 100);
+    pushLog(`💬「${talk.n}」 ${talkMul>1?'<span class="good">想いが深く届いた！</span>':''}`);
+  }
+
+  /* --- 練習（ステータス成長） --- */
+  const mul = mentalMultiplier();
+  if(G.injured>0){
+    pushLog(`<span class="sys">${G.name}は離脱中。リハビリで回復に努めた。</span>`);
+    G.fitness = clamp(G.fitness + 18);
+    G.mentals.stress = clamp(G.mentals.stress - 8);
+    G.injured--;
+    if(G.injured===0) pushLog(`<span class="good">復帰！ピッチに戻ってきた。</span>`);
+  } else {
+    let trainMul = 1;
+    if(P.love.includes(train.type)) trainMul = 1.25;
+    if(P.hate.includes(train.type)) trainMul = 0.75;
+    // コンディション補正
+    const fitMul = 0.6 + 0.4*(G.fitness/100);
+
+    if(train.target==="_rest"){
+      G.fitness = clamp(G.fitness + 24);
+      G.mentals.stress = clamp(G.mentals.stress + train.stress); // -26
+      G.mentals.conf = clamp(G.mentals.conf+2);
+      pushLog(`🛌 しっかり休養。<span class="good">コンディションとストレスが回復した。</span>`);
+    } else {
+      // 成長対象決定
+      let targets = [];
+      if(train.target==="_random"){
+        targets = [pick(STAT_KEYS), pick(STAT_KEYS)];
+      } else {
+        targets = [train.target];
+        // 戦術ミーティング+一緒に考える のシナジー
+        if(train.id==="iq" && talk.iqBonus) targets.push("iq");
+      }
+      const room = ()=> 1; // 伸びしろ概念は cap で表現
+      targets.forEach(tk=>{
+        const cur = G.stats[tk];
+        const headroom = clamp((G.potential - cur)/G.potential, 0, 1); // capに近いほど伸びにくい
+        let gain = rnd(2.2,3.6) * mul * trainMul * fitMul * (0.35 + 0.65*headroom);
+        if(G.awaken) gain *= 1.4;
+        gain = Math.max(0.2, gain);
+        G.stats[tk] = clamp(cur + gain, 0, G.potential);
+        pushLog(`${STAT_INFO[tk].e} ${STAT_INFO[tk].n} <span class="gain">+${gain.toFixed(1)}</span>（→${round(G.stats[tk])}）`);
+      });
+      G.fitness = clamp(G.fitness - (train.stress*0.5));
+      G.mentals.stress = clamp(G.mentals.stress + train.stress);
+      G.mentals.focus = clamp(G.mentals.focus + (train.type==="challenge"?3:1));
+      if(mul<0.7) pushLog(`<span class="bad">心が乱れていて、練習が身に入らない…</span>`);
+      else if(mul>=1.2) pushLog(`<span class="good">最高の集中！ぐんぐん吸収していく。</span>`);
+    }
+  }
+
+  /* --- 自然変化（やる気の自然減衰・覚醒判定） --- */
+  G.mentals.moti = clamp(G.mentals.moti - 2.2*P.motiDecay);
+  G.mentals.focus = clamp(G.mentals.focus - 1.5);
+  G.mentals.stress = clamp(G.mentals.stress - 1.5); // 時間経過で少し癒える
+  checkAwaken();
+
+  G.selTraining=null; G.selTalk=null;
+  G.week++;
+
+  /* --- 試合判定 --- */
+  if(G.week > G.nextMatchWeek){
+    // (進めた週が試合週を越えたら試合)
+  }
+  if(G.week-1 >= G.nextMatchWeek){
+    // すでに上で week++ したので調整
+  }
+
+  /* --- ランダムイベント --- */
+  const ev = rollEvent();
+  if(ev){ render(); openEvent(ev); return; }
+
+  // 試合週か？
+  if(G.nextMatchWeek <= G.week-1){
+    render();
+    playMatch();
+    return;
+  }
+
+  // シーズン終了判定
+  if(G.week > 13){
+    render();
+    endSeason();
+    return;
+  }
+  render();
+}
+
+/* 覚醒：心が満ちると一時的に成長UP */
+function checkAwaken(){
+  const m=G.mentals;
+  if(!G.awaken && m.moti>82 && m.conf>78 && m.focus>75 && m.stress<22){
+    G.awaken=true; G.awakenTimer=3;
+    pushLog(`<span class="ev">✨ ${G.name}が"ゾーン"に入った！しばらく成長が加速する。</span>`);
+    showModal("✨","覚醒 —Football Soul—",
+      `${G.name}の心が完全に整った。<br>練習のすべてが力に変わる「ゾーン」状態に突入！<br><span style="color:#159a52;font-weight:800">これから3週間、成長量が大きく上昇する。</span>`,
+      [{t:"いくぞ！",cls:"btn",fn:closeModal}]);
+  } else if(G.awaken){
+    G.awakenTimer--;
+    if(G.awakenTimer<=0){ G.awaken=false; pushLog(`<span class="sys">ゾーンが解けた。</span>`); }
+  }
+}
+
+/* =========================================================================
+   ランダムイベント
+   ========================================================================= */
+function rollEvent(){
+  if(G.pendingEvent) return null;
+  const m=G.mentals;
+  const r=Math.random();
+  // スランプ：ストレス高
+  if(m.stress>72 && r<0.55){
+    return {
+      ico:"💢", title:"スランプの兆し",
+      txt:`${G.name}の表情が暗い。「…最近、ボールが重く感じるんです」<br>ストレスが限界に近い。どう接する？`,
+      opts:[
+        {t:"無理にでも練習させる", fn:()=>{ G.mentals.stress=clamp(m.stress+10); G.mentals.conf=clamp(m.conf-12);
+          if(Math.random()<0.4){ injure(); } pushLog(`<span class="bad">無理が祟った…状態が悪化した。</span>`); }},
+        {t:"数日オフをあげる", fn:()=>{ G.mentals.stress=clamp(m.stress-30); G.mentals.moti=clamp(m.moti-4);
+          G.bond=clamp(G.bond+3); pushLog(`<span class="good">心が軽くなった。ストレスが大きく抜けた。</span>`); }},
+        {t:"とことん話を聞く", fn:()=>{ G.mentals.stress=clamp(m.stress-18); G.mentals.conf=clamp(m.conf+8);
+          G.bond=clamp(G.bond+6); pushLog(`<span class="good">${G.name}「聞いてくれて、ありがとう」絆が深まった。</span>`); }},
+      ]
+    };
+  }
+  // ライバル出現
+  if(r<0.14){
+    const riv = pick(FIRST)+"（"+pick(OPP_NAMES)+"）";
+    return {
+      ico:"⚔️", title:"ライバル出現",
+      txt:`同世代の注目株 <b>${riv}</b> が頭角を現した。<br>${G.name}はどう反応する？`,
+      opts:[
+        {t:"「絶対に負けない」と燃やす", fn:()=>{
+          const P=PERSONALITIES[G.pers];
+          if(P.type==="rival"||G.pers==="rival"||G.pers==="genius"){ G.mentals.moti=clamp(m.moti+22); G.mentals.focus=clamp(m.focus+12);
+            pushLog(`<span class="good">闘志に火がついた！やる気と集中が急上昇。</span>`);}
+          else{ G.mentals.moti=clamp(m.moti+12); G.mentals.stress=clamp(m.stress+8);
+            pushLog(`やる気は上がったが、少しプレッシャーも…`);}
+        }},
+        {t:"「人は人」とマイペースを保つ", fn:()=>{ G.mentals.stress=clamp(m.stress-6); G.mentals.focus=clamp(m.focus+4);
+          pushLog(`<span class="sys">${G.name}は動じない。自分の道を行く。</span>`); }},
+      ]
+    };
+  }
+  // スカウト/メディア（実力高い時）
+  if(ovr()>62 && r<0.12){
+    return {
+      ico:"📺", title:"メディアの注目",
+      txt:`地元紙が ${G.name} を「次世代の逸材」と報じた。注目が集まっている。`,
+      opts:[
+        {t:"誇りに思う（自信UP）", fn:()=>{ G.mentals.conf=clamp(m.conf+14); G.mentals.moti=clamp(m.moti+8);
+          if(G.pers==="glass"){ G.mentals.stress=clamp(m.stress+10); pushLog(`期待が少し重荷にも…`);}
+          pushLog(`<span class="good">自信がみなぎる。</span>`); }},
+        {t:"気を引き締める（集中UP）", fn:()=>{ G.mentals.focus=clamp(m.focus+12); G.mentals.stress=clamp(m.stress+4);
+          pushLog(`<span class="good">浮かれず、足元を見つめ直した。</span>`); }},
+      ]
+    };
+  }
+  // 偶然の閃き
+  if(r<0.10){
+    const tk=pick(STAT_KEYS);
+    return {
+      ico:"💡", title:"閃きの瞬間",
+      txt:`練習中、${G.name}が何かを掴んだ表情を見せた。「今の…わかった気がする！」`,
+      opts:[
+        {t:"その感覚を伸ばす", fn:()=>{ const g=rnd(3,6); G.stats[tk]=clamp(G.stats[tk]+g,0,G.potential);
+          G.mentals.conf=clamp(m.conf+6); pushLog(`<span class="gain">${STAT_INFO[tk].n} +${g.toFixed(1)}！</span>ひらめきが力になった。`); }},
+      ]
+    };
+  }
+  return null;
+}
+
+function injure(){
+  G.injured = irnd(2,3);
+  G.fitness = clamp(G.fitness-30);
+  G.mentals.stress = clamp(G.mentals.stress+10);
+  pushLog(`<span class="bad">🩹 ${G.name}が負傷…${G.injured}週間の離脱。</span>`);
+}
+
+function openEvent(ev){
+  G.pendingEvent = ev;
+  showModal(ev.ico, ev.title, ev.txt,
+    ev.opts.map(o=>({t:o.t, cls:"btn ghost", fn:()=>{ o.fn(); G.pendingEvent=null; closeModal(); afterEventFlow(); }}))
+  );
+}
+function afterEventFlow(){
+  // イベント後に試合・シーズン終了が控えていれば処理
+  if(G.nextMatchWeek <= G.week-1){ render(); playMatch(); return; }
+  if(G.week>13){ render(); endSeason(); return; }
+  render();
+}
+
+/* =========================================================================
+   試合シミュレーション
+   ========================================================================= */
+function playMatch(){
+  const opp = G.opp;
+  const key = POSITIONS[G.pos].key;
+  // チーム力 = 選手の主要ステータス平均 × 心理 + チームメイト補正(固定+季節)
+  const playerPow = key.reduce((s,k)=>s+G.stats[k],0)/key.length;
+  const m=G.mentals;
+  const psy = (0.7 + 0.3*(m.conf/100)) * (0.8+0.2*(m.focus/100)) * (1-0.3*(m.stress/100));
+  const teammate = 38 + (G.season-1)*6 + G.bond*0.12;
+  let ourPow = (playerPow*1.15*psy + teammate)/2;
+  if(G.awaken) ourPow*=1.12;
+  if(G.injured>0) ourPow*=0.8; // 万全でない
+
+  // 得点シミュレーション
+  let our=0, their=0;
+  const events=[];
+  const drama = 6;
+  let perf = 0; // 選手の活躍度
+  for(let i=0;i<drama;i++){
+    const min = irnd(i*15+1, i*15+15);
+    const atk = Math.random()* (ourPow);
+    const def = Math.random()* (opp.power);
+    if(atk>def*1.08){
+      our++;
+      // 得点関与
+      const involve = Math.random();
+      if(G.pos==="FW" || (G.pos==="MF"&&involve<0.6)){
+        if(involve<0.55){ events.push({m:min,t:`<span class="good">⚽ ${min}' ${G.name}のゴール！！</span>`}); G.goals++; perf+=3; }
+        else { events.push({m:min,t:`<span class="good">🅰️ ${min}' ${G.name}のアシスト！</span>`}); perf+=2; }
+      } else if(G.pos==="DF"||G.pos==="GK"){
+        events.push({m:min,t:`<span class="good">⚽ ${min}' 味方のゴール！ ${G.name}も攻撃参加</span>`}); perf+=1;
+      } else {
+        events.push({m:min,t:`<span class="good">⚽ ${min}' チームが先制点！</span>`}); perf+=1;
+      }
+    } else if(def>atk*1.12){
+      // 失点 → 守備陣の見せ場 or 被弾
+      if((G.pos==="DF"||G.pos==="GK") && Math.random()<0.55){
+        events.push({m:min,t:`<span class="good">🛡️ ${min}' ${G.name}が決定機を阻止！</span>`}); perf+=2;
+      } else {
+        their++;
+        events.push({m:min,t:`<span class="bad">💥 ${min}' 失点を許す…</span>`});
+      }
+    } else {
+      if(Math.random()<0.4) events.push({m:min,t:`<span class="sys">${min}' 互いに譲らない攻防</span>`});
+    }
+  }
+  events.sort((a,b)=>a.m-b.m);
+
+  const win = our>their, draw = our===their;
+  const resStr = win?"WIN":draw?"DRAW":"LOSE";
+  G.results.push(resStr);
+  if(perf>=3) G.momCount++;
+
+  // 試合後メンタル変化
+  const P=PERSONALITIES[G.pers];
+  if(win){
+    G.mentals.conf=clamp(m.conf+12); G.mentals.moti=clamp(m.moti+10); G.mentals.stress=clamp(m.stress-6);
+  } else if(draw){
+    G.mentals.conf=clamp(m.conf+2); G.mentals.stress=clamp(m.stress+2);
+  } else {
+    if(G.pers==="rival"){ G.mentals.moti=clamp(m.moti+14); G.mentals.stress=clamp(m.stress+6);}
+    else { G.mentals.conf=clamp(m.conf-10); G.mentals.moti=clamp(m.moti-4); G.mentals.stress=clamp(m.stress+12);}
+  }
+  if(perf>=3){ G.mentals.conf=clamp(G.mentals.conf+8); G.bond=clamp(G.bond+3); }
+  G.fitness=clamp(G.fitness-14);
+
+  // 次の試合をセット
+  G.matchIdx++;
+  G.nextMatchWeek = G.nextMatchWeek + 4;
+  const prevOpp = opp;
+  rollOpponent();
+
+  // 試合画面
+  app.innerHTML = `
+    <div class="topbar"><div class="logo">MATCH DAY<small>第${G.season}季 第${G.matchIdx}節</small></div>
+      <span class="pill">第${G.week-1}週</span></div>
+    <div class="matchscene">
+      <div class="scoreboard">
+        <div class="tm">${G.name}<br><small style="opacity:.7">のチーム</small></div>
+        <div class="sc">${our}<small> - </small>${their}</div>
+        <div class="tm">${prevOpp.name}<br><small style="opacity:.7">力 ${round(prevOpp.power)}</small></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 class="section">試合実況</h2>
+      <div class="log" style="max-height:none">
+        <p class="sys">— キックオフ！ vs ${prevOpp.name} —</p>
+        ${events.map(e=>`<p>${e.t}</p>`).join("")}
+        <p class="sys">— 試合終了 —</p>
+        <p style="font-size:15px;font-weight:800;color:${win?'#74f0a3':draw?'#ffd98a':'#ff9b9b'}">
+          結果：${win?'勝利！🎉':draw?'引き分け':'敗戦…'} ${perf>=3?'　🏅'+G.name+' がマン・オブ・ザ・マッチ！':''}</p>
+      </div>
+    </div>
+    <button class="btn alt" id="contBtn">育成にもどる ▶</button>
+  `;
+  $("#contBtn").onclick = ()=>{
+    pushLog(`<span class="ev">⚽ vs ${prevOpp.name} ${our}-${their} ${win?'勝利':draw?'分け':'敗戦'}</span>`);
+    if(G.week>13){ render(); endSeason(); return; }
+    render();
+  };
+}
+
+/* =========================================================================
+   シーズン終了 → 次シーズン / 終幕
+   ========================================================================= */
+function endSeason(){
+  const W=G.results.filter(r=>r==="WIN").length;
+  const D=G.results.filter(r=>r==="DRAW").length;
+  const L=G.results.filter(r=>r==="LOSE").length;
+
+  if(G.season >= G.maxSeason){
+    G.over=true; renderEnding(); return;
+  }
+
+  // 次シーズンへ：年齢UP・潜在能力が少し開花・コンディション回復
+  const grow = irnd(2,5);
+  G.potential = clamp(G.potential + grow, 0, 99);
+  G.age++; G.season++; G.week=1; G.results=[];
+  G.nextMatchWeek=4; G.matchIdx=0;
+  G.fitness=100;
+  G.mentals.stress=clamp(G.mentals.stress-20);
+  G.mentals.moti=clamp(G.mentals.moti+10);
+  rollOpponent();
+
+  showModal("🏆", `第${G.season-1}季 終了`,
+    `今季の成績：<b>${W}勝 ${D}分 ${L}敗</b>　ゴール ${G.goals}　MOM ${G.momCount}回<br><br>
+     ${G.name}は ${G.age}歳になり、潜在能力が <span style="color:#159a52;font-weight:800">+${grow}（→${G.potential}）</span> 開花した。<br>
+     <span class="sys">いよいよ第${G.season}季。夢の舞台が近づいてくる。</span>`,
+    [{t:`第${G.season}季を始める ▶`,cls:"btn",fn:()=>{ closeModal(); render(); }}]);
+}
+
+function renderEnding(){
+  const o=ovr();
+  const totalW = G.results ? 0 : 0;
+  // 評価決定
+  let title, ico, desc, rank;
+  const m=G.mentals;
+  const happy = m.stress<50 && G.bond>25;
+  if(o>=88){ rank="SS"; ico="🌍"; title="世界が恋した天才";
+    desc=`${G.name}は欧州の頂点へと羽ばたいた。ピッチに立つだけでスタジアムが沸く、時代を象徴するスーパースター。あの日キミがかけた言葉が、ひとつの伝説を育てたのだ。`;}
+  else if(o>=78){ rank="S"; ico="⭐"; title="国を背負うエース";
+    desc=`${G.name}は代表のエースナンバーを背負う存在に。重圧の中でも自分を見失わなかったのは、心を支え続けたキミがいたから。`;}
+  else if(o>=68){ rank="A"; ico="🏅"; title="プロのレギュラー";
+    desc=`${G.name}はプロの世界で確かな地位を築いた。派手さはなくとも、チームに欠かせない頼れる選手へ。着実な成長の物語だった。`;}
+  else if(o>=58){ rank="B"; ico="⚽"; title="未来のある若手";
+    desc=`${G.name}はプロ契約を勝ち取った。まだ荒削りだが、伸びしろは十分。物語はここから続いていく。`;}
+  else { rank="C"; ico="🌱"; title="それでも、サッカーが好き";
+    desc=`トップには届かなかった。それでも${G.name}はボールを蹴る喜びを失わなかった。${happy?'笑顔で':''}次の夢へと歩き出す。`;}
+
+  app.innerHTML = `
+    <div class="title-hero">
+      <div class="ball">${ico}</div>
+      <h1>${title}</h1>
+      <p>― FOOTBALL SOUL ・ 育成の記録 ―</p>
+    </div>
+    <div class="pcard">
+      <div class="shine"></div>
+      <div class="head">
+        <div class="face">${PERSONALITIES[G.pers].e}</div>
+        <div class="who"><div class="nm">${G.name}</div>
+          <div class="sub">${G.age}歳 ・ ${G.pos} ・ ${PERSONALITIES[G.pers].n}</div></div>
+        <div class="ovr"><b>${o}</b><span>FINAL OVR</span></div>
+      </div>
+      <div class="ptags">
+        <span class="ptag gold">評価ランク ${rank}</span>
+        <span class="ptag">通算 ⚽${G.goals}ゴール</span>
+        <span class="ptag">🏅MOM ${G.momCount}回</span>
+        <span class="ptag">絆 Lv.${Math.floor(G.bond/10)}</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 class="section">最終能力値</h2>
+      <div class="grid2">
+        <div>${["speed","power","tech","pass"].map(statBar).join("")}</div>
+        <div>${["shoot","defense","iq"].map(statBar).join("")}</div>
+      </div>
+      <div class="divline"></div>
+      <p style="font-size:13px;line-height:1.9;color:#33483c">${desc}</p>
+    </div>
+    <button class="btn" id="againBtn">新しい才能を育てる ▶</button>
+    <p class="hint">同じ性格でも、かける言葉で結末は変わる。<br>次はどんなエースを育てる？</p>
+    <div class="footer">Thank you for playing — Football Soul</div>
+  `;
+  $("#againBtn").onclick = ()=>{ G=null; render(); };
+}
+
+/* =========================================================================
+   汎用UI
+   ========================================================================= */
+function toast(msg){
+  const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1700);
+}
+function showModal(ico,title,html,buttons){
+  $("#modalcard").innerHTML = `
+    <div class="ev-ico">${ico}</div>
+    <h3>${title}</h3>
+    <div class="ev-txt">${html}</div>
+    <div class="choices" id="modalBtns"></div>`;
+  const box=$("#modalBtns");
+  buttons.forEach(b=>{
+    const el=document.createElement("button");
+    el.className=b.cls||"btn"; el.textContent=b.t; el.style.marginTop="0";
+    el.onclick=b.fn; box.appendChild(el);
+  });
+  $("#modal").classList.add("show");
+}
+function closeModal(){ $("#modal").classList.remove("show"); }
+
+/* 起動 */
+render();
+</script>
+</body>
+</html>
