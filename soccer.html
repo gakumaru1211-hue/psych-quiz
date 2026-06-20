@@ -4,177 +4,187 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>フットボール・ソウル ～ココロで育てるサッカー育成譚～</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   :root{
-    --pitch:#1f7a3d; --pitch2:#15622f; --line:#bdeacb;
-    --ink:#0e1a14; --paper:#f4fbf6; --gold:#ffcf4d; --accent:#37d67a;
-    --danger:#ff5d6c; --stress:#ff7a45; --moti:#ffd23f; --conf:#37b6ff; --focus:#a472ff;
-    --card:#ffffff; --shadow:0 10px 30px rgba(0,0,0,.18);
+    --pitch:#2e8b3d; --pitch2:#1d6b2c; --line:#bdeacb;
+    --ink:#15162a; --paper:#f6f4e2; --gold:#ffcc33; --accent:#3ddc62;
+    --danger:#e23a3a; --stress:#ff8a3a; --moti:#ffd23f; --conf:#3a8de2; --focus:#9a5cff;
+    --card:#f6f4e2; --shadow:4px 4px 0 rgba(0,0,0,.45);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  img.spr,canvas.spr{image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
   html,body{margin:0;padding:0;}
   body{
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;
+    font-family:"DotGothic16","Hiragino Kaku Gothic ProN",Meiryo,monospace;
     color:var(--ink);
     background:
-      radial-gradient(120% 90% at 50% -10%, #2a9b53 0%, var(--pitch) 45%, var(--pitch2) 100%) fixed;
+      repeating-linear-gradient(0deg, #1d6b2c 0 22px, #257a34 22px 44px) fixed;
     min-height:100vh; -webkit-text-size-adjust:100%;
   }
-  #app{max-width:520px;margin:0 auto;padding:14px 14px 60px;}
-  .topbar{display:flex;align-items:center;justify-content:space-between;color:#eafff1;margin-bottom:10px;}
-  .topbar .logo{font-weight:800;letter-spacing:.04em;font-size:15px;text-shadow:0 2px 6px rgba(0,0,0,.35);}
-  .topbar .logo small{display:block;font-weight:600;font-size:10px;opacity:.85;letter-spacing:.12em;}
-  .meta{display:flex;gap:8px;}
-  .pill{background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.18);color:#eafff1;
-    padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700;backdrop-filter:blur(4px);}
-  .panel{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:16px;margin-bottom:12px;}
-  h2.section{font-size:13px;margin:2px 0 12px;letter-spacing:.06em;color:#2a6b43;
-    display:flex;align-items:center;gap:7px;}
-  h2.section::before{content:"";width:4px;height:15px;border-radius:3px;background:var(--accent);}
+  /* 走査線オーバーレイ */
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 2px, transparent 2px 4px);
+    mix-blend-mode:multiply;}
+  .pixfont{font-family:"Press Start 2P","DotGothic16",monospace;}
+  #app{max-width:520px;margin:0 auto;padding:14px 14px 60px;position:relative;z-index:1;}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;color:#fff;margin-bottom:12px;
+    text-shadow:2px 2px 0 #0a2913;}
+  .topbar .logo{font-weight:400;font-size:14px;line-height:1.5;}
+  .topbar .logo small{display:block;font-size:9px;opacity:.9;margin-top:3px;}
+  .meta{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .pill{background:var(--ink);border:2px solid #000;color:#fff;
+    padding:4px 8px;font-size:10px;font-weight:400;box-shadow:2px 2px 0 rgba(0,0,0,.4);}
+
+  .panel{background:var(--card);border:3px solid var(--ink);box-shadow:var(--shadow);padding:14px;margin-bottom:14px;}
+  h2.section{font-size:12px;margin:0 0 12px;color:var(--ink);
+    display:flex;align-items:center;gap:7px;border-bottom:3px dashed #c9c5a0;padding-bottom:8px;}
+  h2.section::before{content:"";width:10px;height:10px;background:var(--accent);box-shadow:2px 2px 0 #1d6b2c;}
 
   /* ====== タイトル ====== */
-  .title-hero{text-align:center;color:#fff;padding:24px 6px 6px;}
-  .title-hero .ball{font-size:62px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.4));animation:floaty 3s ease-in-out infinite;}
-  @keyframes floaty{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-12px) rotate(6deg)}}
-  .title-hero h1{font-size:27px;margin:6px 0 2px;text-shadow:0 4px 14px rgba(0,0,0,.45);letter-spacing:.02em;}
-  .title-hero p{opacity:.92;font-size:12.5px;line-height:1.7;margin:8px 16px 0;}
-  .concept{background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.2);border-radius:14px;
-    padding:12px 14px;margin:16px 4px;color:#eafff1;font-size:12px;line-height:1.8;text-align:left;}
+  .title-hero{text-align:center;color:#fff;padding:18px 6px 6px;text-shadow:3px 3px 0 #0a2913;}
+  .title-hero .ball{display:inline-block;animation:floaty 1.2s steps(2) infinite;}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  .title-hero h1{font-size:18px;line-height:1.6;margin:10px 0 2px;}
+  .title-hero p{font-size:11px;line-height:1.7;margin:10px 16px 0;}
+  .concept{background:var(--ink);border:3px solid #000;
+    padding:13px 14px;margin:16px 2px;color:#eafff1;font-size:11px;line-height:1.9;text-align:left;
+    box-shadow:var(--shadow);}
   .concept b{color:var(--gold);}
 
   /* ====== ボタン ====== */
-  .btn{display:block;width:100%;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:800;
-    color:#0e1a14;background:linear-gradient(135deg,var(--gold),#ffb800);cursor:pointer;
-    box-shadow:0 6px 0 #c98a00,0 10px 20px rgba(0,0,0,.25);transition:transform .05s, box-shadow .05s;
-    letter-spacing:.04em;}
-  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c98a00,0 6px 12px rgba(0,0,0,.25);}
-  .btn.alt{background:linear-gradient(135deg,#3de07f,#19b45e);color:#04331b;box-shadow:0 6px 0 #0d8c45,0 10px 20px rgba(0,0,0,.25);}
-  .btn.alt:active{box-shadow:0 2px 0 #0d8c45,0 6px 12px rgba(0,0,0,.25);}
-  .btn.ghost{background:#eef5f0;color:#2a6b43;box-shadow:0 4px 0 #c5d8cc;}
-  .btn.ghost:active{box-shadow:0 1px 0 #c5d8cc;}
+  .btn{display:block;width:100%;border:3px solid var(--ink);padding:14px;font-size:13px;font-weight:400;
+    font-family:inherit;color:var(--ink);background:var(--gold);cursor:pointer;
+    box-shadow:4px 4px 0 #000;transition:transform .04s, box-shadow .04s;}
+  .btn:active{transform:translate(4px,4px);box-shadow:0 0 0 #000;}
+  .btn.alt{background:var(--accent);color:#06331a;}
+  .btn.ghost{background:#d9d6bd;color:var(--ink);}
   .btn:disabled{filter:grayscale(.6) opacity(.55);pointer-events:none;}
 
-  .field{margin:10px 0;}
-  .field label{display:block;font-size:12px;font-weight:700;color:#2a6b43;margin-bottom:5px;}
-  .field input,.field select{width:100%;padding:12px;border-radius:12px;border:2px solid #d8e8de;
-    font-size:15px;font-family:inherit;background:#fbfffc;}
+  .field{margin:11px 0;}
+  .field label{display:block;font-size:11px;font-weight:400;color:var(--ink);margin-bottom:6px;}
+  .field input,.field select{width:100%;padding:11px;border:3px solid var(--ink);
+    font-size:14px;font-family:inherit;background:#fffef2;}
   .field input:focus,.field select:focus{outline:none;border-color:var(--accent);}
 
   /* ====== 選手カード ====== */
-  .pcard{position:relative;border-radius:18px;overflow:hidden;color:#fff;margin-bottom:12px;
-    background:linear-gradient(160deg,#16324a,#0c1c2b);box-shadow:var(--shadow);}
-  .pcard .shine{position:absolute;inset:0;background:
-    radial-gradient(120% 60% at 80% 0%, rgba(255,255,255,.18), transparent 60%);pointer-events:none;}
-  .pcard .head{display:flex;align-items:center;gap:12px;padding:14px 16px 8px;}
-  .pcard .face{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    font-size:34px;background:linear-gradient(135deg,#37d67a,#1f9b57);box-shadow:0 4px 12px rgba(0,0,0,.3);flex:0 0 auto;}
+  .pcard{position:relative;color:#fff;margin-bottom:14px;
+    background:#16324a;border:3px solid #000;box-shadow:var(--shadow);}
+  .pcard .shine{display:none;}
+  .pcard .head{display:flex;align-items:center;gap:12px;padding:12px 14px 8px;}
+  .pcard .face{width:60px;height:64px;display:flex;align-items:center;justify-content:center;
+    background:#0d1f2e;border:3px solid #000;flex:0 0 auto;
+    background-image:repeating-linear-gradient(0deg,#0d1f2e 0 6px,#11283b 6px 12px);}
   .pcard .who{flex:1;min-width:0;}
-  .pcard .who .nm{font-size:18px;font-weight:800;}
-  .pcard .who .sub{font-size:11px;opacity:.85;margin-top:2px;}
-  .pcard .ovr{text-align:center;flex:0 0 auto;}
-  .pcard .ovr b{font-size:30px;font-weight:900;line-height:1;color:var(--gold);}
-  .pcard .ovr span{display:block;font-size:9px;opacity:.8;letter-spacing:.18em;}
-  .ptags{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px;}
-  .ptag{font-size:10.5px;font-weight:700;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);
-    padding:4px 9px;border-radius:999px;}
-  .ptag.gold{background:rgba(255,207,77,.22);border-color:rgba(255,207,77,.5);color:#ffe49b;}
+  .pcard .who .nm{font-size:16px;font-weight:400;}
+  .pcard .who .sub{font-size:10px;opacity:.9;margin-top:4px;line-height:1.5;}
+  .pcard .ovr{text-align:center;flex:0 0 auto;border:3px solid #000;background:#0d1f2e;padding:4px 8px;}
+  .pcard .ovr b{font-size:24px;font-weight:400;line-height:1;color:var(--gold);font-family:"Press Start 2P",monospace;}
+  .pcard .ovr span{display:block;font-size:8px;opacity:.8;margin-top:4px;}
+  .ptags{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 14px;}
+  .ptag{font-size:9.5px;font-weight:400;background:#0d1f2e;border:2px solid #000;
+    padding:4px 7px;}
+  .ptag.gold{background:#5a4a12;color:var(--gold);}
 
-  /* ====== ステータスバー ====== */
-  .stat{margin-bottom:9px;}
-  .stat .row{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-bottom:3px;color:#2c4a39;}
+  /* ====== ステータスバー（ドット分割） ====== */
+  .stat{margin-bottom:10px;}
+  .stat .row{display:flex;justify-content:space-between;font-size:10.5px;font-weight:400;margin-bottom:4px;color:var(--ink);}
   .stat .row .v{font-variant-numeric:tabular-nums;}
-  .bar{height:9px;border-radius:6px;background:#e6efe9;overflow:hidden;}
-  .bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#37d67a,#1f9b57);
-    transition:width .6s cubic-bezier(.2,.8,.2,1);}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
+  .bar{position:relative;height:12px;background:#c9c5a0;border:2px solid var(--ink);overflow:hidden;}
+  .bar>i{display:block;height:100%;background:var(--accent);transition:width .35s steps(8);}
+  .bar::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(90deg, transparent 0 4px, var(--card) 4px 6px);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;}
 
   /* ====== メンタルゲージ ====== */
-  .mentals{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .mg{background:#f6faf7;border-radius:12px;padding:9px 11px;}
-  .mg .t{font-size:11px;font-weight:800;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-  .mg .t em{font-style:normal;font-size:13px;font-variant-numeric:tabular-nums;}
-  .mg .bar{height:7px;}
-  .mg.moti .bar>i{background:linear-gradient(90deg,#ffe16a,#ffb300);}
-  .mg.conf .bar>i{background:linear-gradient(90deg,#7cd4ff,#1f8fff);}
-  .mg.focus .bar>i{background:linear-gradient(90deg,#c7a8ff,#7a3cff);}
-  .mg.stress .bar>i{background:linear-gradient(90deg,#ffb38a,#ff5d3c);}
+  .mentals{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .mg{background:#ece4c2;border:2px solid var(--ink);padding:8px 9px;}
+  .mg .t{font-size:10px;font-weight:400;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .mg .t em{font-style:normal;font-size:12px;font-variant-numeric:tabular-nums;}
+  .mg .bar{height:10px;}
+  .mg.moti .bar>i{background:var(--moti);}
+  .mg.conf .bar>i{background:var(--conf);}
+  .mg.focus .bar>i{background:var(--focus);}
+  .mg.stress .bar>i{background:var(--stress);}
+  .mg .bar::after{background:repeating-linear-gradient(90deg, transparent 0 4px, #ece4c2 4px 6px);}
 
-  .multiplier{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;
-    font-size:12px;font-weight:800;color:#2a6b43;background:#eafaf0;border-radius:12px;padding:9px;cursor:pointer;}
-  .multiplier b{font-size:18px;color:#159a52;}
-  .multiplier .q{margin-left:auto;width:18px;height:18px;border-radius:50%;background:#37d67a;color:#fff;
-    display:inline-flex;align-items:center;justify-content:center;font-size:12px;}
+  .multiplier{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;
+    font-size:11px;font-weight:400;color:var(--ink);background:#ece4c2;border:2px solid var(--ink);padding:9px;cursor:pointer;}
+  .multiplier b{font-size:18px;color:#1d6b2c;font-family:"Press Start 2P",monospace;}
+  .multiplier .q{margin-left:auto;width:18px;height:18px;background:var(--accent);color:#06331a;border:2px solid var(--ink);
+    display:inline-flex;align-items:center;justify-content:center;font-size:11px;}
 
   /* 選手の本音バブル */
-  .bubble{display:flex;gap:10px;align-items:flex-start;background:linear-gradient(135deg,#fff6e0,#fff);
-    border:2px dashed #ffd98a;border-radius:14px;padding:11px 13px;margin-bottom:12px;}
-  .bubble .av{font-size:26px;flex:0 0 auto;}
+  .bubble{display:flex;gap:10px;align-items:center;background:#fffef2;
+    border:3px solid var(--ink);padding:11px 13px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .bubble .av{flex:0 0 auto;}
   .bubble .bd{flex:1;min-width:0;}
-  .bubble .bd .lbl{font-size:10px;font-weight:800;color:#c98a00;letter-spacing:.08em;}
-  .bubble .bd .msg{font-size:13.5px;font-weight:700;color:#5a4a1e;margin-top:2px;line-height:1.5;}
+  .bubble .bd .lbl{font-size:9px;font-weight:400;color:#b07d00;}
+  .bubble .bd .msg{font-size:12.5px;font-weight:400;color:var(--ink);margin-top:4px;line-height:1.6;}
 
   /* 予想プレビュー */
-  .preview{background:#0d1f16;color:#cdeed8;border-radius:12px;padding:11px 13px;margin:10px 0 0;font-size:12px;line-height:1.7;}
-  .preview .ttl{font-size:10px;letter-spacing:.1em;color:#8fb6a1;font-weight:800;margin-bottom:4px;}
-  .preview .gain{color:var(--gold);font-weight:800;}
-  .preview .up{color:#74f0a3;font-weight:700;} .preview .dn{color:#ff9b9b;font-weight:700;}
-  .preview .warn{color:#ffd98a;font-weight:800;}
+  .preview{background:var(--ink);color:#cdeed8;border:3px solid #000;padding:11px 13px;margin:12px 0 0;font-size:11px;line-height:1.8;}
+  .preview .ttl{font-size:9px;color:#8fb6a1;margin-bottom:5px;}
+  .preview .gain{color:var(--gold);font-weight:400;}
+  .preview .up{color:#74f0a3;} .preview .dn{color:#ff9b9b;}
+  .preview .warn{color:#ffd98a;}
   .preview .empty{color:#7a9a88;}
 
   /* ====== 選択肢 ====== */
-  .choices{display:grid;gap:9px;}
-  .choice{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:2px solid #e3eee8;
-    background:#fff;border-radius:14px;padding:12px;cursor:pointer;transition:.12s;font-family:inherit;}
-  .choice:active{transform:scale(.98);}
-  .choice.sel{border-color:var(--accent);background:#effaf2;box-shadow:0 0 0 3px rgba(55,214,122,.18);}
-  .choice .ico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
-    font-size:22px;background:#eef5f0;flex:0 0 auto;}
+  .choices{display:grid;gap:8px;}
+  .choice{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:3px solid var(--ink);
+    background:#fffef2;padding:10px;cursor:pointer;transition:transform .04s;font-family:inherit;
+    box-shadow:3px 3px 0 rgba(0,0,0,.25);}
+  .choice:active{transform:translate(3px,3px);box-shadow:0 0 0;}
+  .choice.sel{background:#d6f3df;border-color:#1d6b2c;box-shadow:3px 3px 0 #1d6b2c;}
+  .choice .ico{width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+    font-size:20px;background:#ece4c2;border:2px solid var(--ink);flex:0 0 auto;}
   .choice .tx{flex:1;min-width:0;}
-  .choice .tx .h{font-size:14px;font-weight:800;}
-  .choice .tx .d{font-size:11px;color:#5a6f63;margin-top:2px;line-height:1.4;}
-  .choice .tag{font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:#eef5f0;color:#3a7a55;}
+  .choice .tx .h{font-size:12.5px;font-weight:400;}
+  .choice .tx .d{font-size:10px;color:#6a6a55;margin-top:3px;line-height:1.4;}
+  .choice .tag{font-size:9px;font-weight:400;padding:2px 5px;border:1px solid var(--ink);background:#ece4c2;}
 
   /* ====== ログ / 実況 ====== */
-  .log{background:#0d1f16;color:#cdeed8;border-radius:14px;padding:12px 14px;font-size:12.5px;line-height:1.7;
+  .log{background:#0d1f16;color:#cdeed8;border:3px solid #000;padding:11px 13px;font-size:11px;line-height:1.8;
     max-height:230px;overflow-y:auto;}
   .log p{margin:0 0 7px;}
-  .log .gain{color:var(--gold);font-weight:800;}
-  .log .good{color:#74f0a3;font-weight:700;}
-  .log .bad{color:#ff9b9b;font-weight:700;}
-  .log .ev{color:#ffd98a;font-weight:800;}
-  .log .sys{color:#8fb6a1;}
+  .log .gain{color:var(--gold);} .log .good{color:#74f0a3;}
+  .log .bad{color:#ff9b9b;} .log .ev{color:#ffd98a;} .log .sys{color:#8fb6a1;}
 
   /* 試合実況 */
   .matchscene{text-align:center;color:#fff;}
-  .scoreboard{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 12px;
-    background:linear-gradient(135deg,#0c1c2b,#16324a);border-radius:14px;padding:14px;box-shadow:var(--shadow);}
-  .scoreboard .tm{flex:1;font-size:13px;font-weight:800;}
-  .scoreboard .sc{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;}
+  .scoreboard{display:flex;align-items:center;justify-content:center;gap:12px;margin:6px 0 14px;
+    background:#16324a;border:3px solid #000;padding:14px;box-shadow:var(--shadow);}
+  .scoreboard .tm{flex:1;font-size:11px;font-weight:400;}
+  .scoreboard .sc{font-size:30px;font-weight:400;font-family:"Press Start 2P",monospace;}
   .scoreboard .sc small{font-size:13px;opacity:.6;}
 
   /* トースト */
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(40px);
-    background:#0d1f16;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:700;
-    box-shadow:var(--shadow);opacity:0;transition:.3s;z-index:50;pointer-events:none;max-width:90%;text-align:center;}
+    background:var(--ink);color:#fff;padding:11px 16px;border:3px solid #000;font-size:12px;font-weight:400;
+    box-shadow:var(--shadow);opacity:0;transition:.2s;z-index:100;pointer-events:none;max-width:90%;text-align:center;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
   /* イベントモーダル */
-  #modal{position:fixed;inset:0;background:rgba(6,18,12,.66);display:none;align-items:center;justify-content:center;
-    padding:20px;z-index:40;backdrop-filter:blur(3px);}
+  #modal{position:fixed;inset:0;background:rgba(8,12,22,.78);display:none;align-items:center;justify-content:center;
+    padding:20px;z-index:101;}
   #modal.show{display:flex;}
-  .modalcard{background:var(--card);border-radius:20px;max-width:440px;width:100%;padding:20px;box-shadow:var(--shadow);
-    animation:pop .3s cubic-bezier(.2,1.2,.4,1);}
-  @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
-  .modalcard .ev-ico{font-size:46px;text-align:center;}
-  .modalcard h3{text-align:center;margin:6px 0 8px;font-size:18px;}
-  .modalcard .ev-txt{font-size:13px;line-height:1.8;color:#33483c;margin-bottom:14px;text-align:center;}
+  .modalcard{background:var(--card);border:4px solid var(--ink);max-width:440px;width:100%;padding:18px;box-shadow:6px 6px 0 rgba(0,0,0,.5);
+    animation:pop .18s steps(3);}
+  @keyframes pop{from{transform:scale(.8)}to{transform:scale(1)}}
+  .modalcard .ev-ico{font-size:40px;text-align:center;}
+  .modalcard h3{text-align:center;margin:8px 0 10px;font-size:15px;font-weight:400;}
+  .modalcard .ev-txt{font-size:12px;line-height:1.9;color:var(--ink);margin-bottom:14px;text-align:center;}
 
-  .hint{font-size:11px;color:#5a6f63;line-height:1.6;margin-top:8px;text-align:center;}
-  .footer{text-align:center;color:rgba(255,255,255,.55);font-size:10.5px;margin-top:14px;letter-spacing:.05em;}
+  .hint{font-size:10px;color:#6a6a55;line-height:1.7;margin-top:8px;text-align:center;}
+  .footer{text-align:center;color:rgba(255,255,255,.7);font-size:9px;margin-top:14px;text-shadow:2px 2px 0 #0a2913;}
   .center{text-align:center;}
-  .divline{height:1px;background:#e6efe9;margin:14px 0;}
-  .seasonbadge{display:inline-block;background:#eafaf0;color:#159a52;font-weight:800;font-size:11px;
-    padding:3px 10px;border-radius:999px;}
+  .divline{height:3px;background:#c9c5a0;margin:14px 0;border-top:1px dashed var(--ink);}
+  .seasonbadge{display:inline-block;background:#5a4a12;color:var(--gold);font-weight:400;font-size:10px;
+    padding:3px 8px;border:2px solid var(--ink);}
 </style>
 </head>
 <body>
@@ -196,6 +206,61 @@ const irnd = (a,b)=> Math.floor(rnd(a,b+1));
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 const clamp = (v,a=0,b=100)=> Math.max(a,Math.min(b,v));
 const round = v => Math.round(v);
+
+/* ---- ドット絵スプライト生成 -------------------------------------------- */
+const _sprCache = {};
+function makeSprite(rows, pal){
+  const H=rows.length, W=rows[0].length;
+  const c=document.createElement("canvas"); c.width=W; c.height=H;
+  const ctx=c.getContext("2d");
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const col=pal[rows[y][x]];
+    if(col){ ctx.fillStyle=col; ctx.fillRect(x,y,1,1); }
+  }
+  return c.toDataURL();
+}
+function spriteTag(key, rows, pal, scale){
+  if(!_sprCache[key]) _sprCache[key]=makeSprite(rows,pal);
+  const W=rows[0].length, H=rows.length;
+  return `<img class="spr" src="${_sprCache[key]}" alt="" width="${W*scale}" height="${H*scale}" style="width:${W*scale}px;height:${H*scale}px">`;
+}
+// 選手スプライト（12x14）。ユニフォーム色はポジションごと。
+const PLAYER_ROWS = [
+  "....kkkk....",
+  "...khhhhk...",
+  "..khhhhhhk..",
+  "..ksssssk...",
+  "..kEssEsk...",
+  "..ksssssk...",
+  "...kssssk...",
+  "..kjjjjjjk..",
+  ".kjjwwwwjjk.",
+  ".kjjwNNwjjk.",
+  "..kjjjjjjk..",
+  "..kpp..ppk..",
+  "..kpp..ppk..",
+  "..bb....bb..",
+];
+const JERSEY = {FW:"#e23a3a", MF:"#3ddc62", DF:"#3a8de2", GK:"#ffcc33"};
+function playerSprite(pos, scale=4){
+  const pal={k:"#101024",h:"#5a3a1a",s:"#f1c08a",E:"#101024",
+    j:JERSEY[pos]||"#3ddc62",w:"#ffffff",N:"#101024",p:"#2a2a40",b:"#111111"};
+  return spriteTag("pl_"+pos, PLAYER_ROWS, pal, scale);
+}
+// サッカーボール（8x8）
+const BALL_ROWS = [
+  "..wwww..",
+  ".wKwwKw.",
+  "wwwKKwww",
+  "wKKwwKKw",
+  "wKKwwKKw",
+  "wwwKKwww",
+  ".wKwwKw.",
+  "..wwww..",
+];
+function ballSprite(scale=7){
+  return spriteTag("ball", BALL_ROWS, {w:"#ffffff",K:"#15162a"}, scale);
+}
 
 /* ---- データ定義 ---------------------------------------------------------- */
 const STAT_KEYS = ["speed","power","tech","pass","shoot","defense","iq"];
@@ -378,7 +443,7 @@ function render(){
 function renderTitle(){
   app.innerHTML = `
     <div class="title-hero">
-      <div class="ball">⚽</div>
+      <div class="ball">${ballSprite(9)}</div>
       <h1>フットボール・ソウル</h1>
       <p>～ ココロで育てるサッカー育成譚 ～</p>
     </div>
@@ -454,7 +519,7 @@ function renderWeek(){
     <div class="pcard">
       <div class="shine"></div>
       <div class="head">
-        <div class="face">${P.e}</div>
+        <div class="face">${playerSprite(G.pos,4)}</div>
         <div class="who">
           <div class="nm">${G.name}</div>
           <div class="sub">${G.age}歳 ・ ${G.pos} ${POSITIONS[G.pos].n} ・ ${P.n}</div>
@@ -495,7 +560,7 @@ function renderWeek(){
     </div>
 
     <div class="bubble">
-      <div class="av">${P.e}💬</div>
+      <div class="av">${playerSprite(G.pos,3)}</div>
       <div class="bd"><div class="lbl">${G.name}の今の本音</div>
         <div class="msg">「${needBubble()}」</div></div>
     </div>
@@ -1081,7 +1146,7 @@ function renderEnding(){
     <div class="pcard">
       <div class="shine"></div>
       <div class="head">
-        <div class="face">${PERSONALITIES[G.pers].e}</div>
+        <div class="face">${playerSprite(G.pos,4)}</div>
         <div class="who"><div class="nm">${G.name}</div>
           <div class="sub">${G.age}歳 ・ ${G.pos} ・ ${PERSONALITIES[G.pers].n}</div></div>
         <div class="ovr"><b>${o}</b><span>FINAL OVR</span></div>
