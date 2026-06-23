@@ -126,6 +126,38 @@ input:focus, select:focus{ outline:none; border-color:var(--pink); }
 .shared{ font-size:.74rem; color:var(--muted); margin-top:6px; }
 .shared b{ color:var(--pink-d); }
 
+/* リスクメーター */
+.risk-row{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.72rem; color:var(--muted); }
+.risk-row .rl{ width:54px; flex:none; font-weight:700; }
+.risk-track{ flex:1; height:7px; border-radius:99px; background:linear-gradient(90deg,#10b981,#f59e0b,#ef4444); position:relative; }
+.risk-dot{ position:absolute; top:50%; width:13px; height:13px; border-radius:50%; background:#fff; border:3px solid #1f2937; transform:translate(-50%,-50%); }
+
+/* 展開トグル＆セクター比較 */
+.detail-toggle{ text-align:center; margin-top:10px; font-size:.74rem; font-weight:700; color:var(--pink-d); cursor:pointer; user-select:none; }
+.match-detail{ display:none; margin-top:12px; border-top:1px dashed #f0d9e6; padding-top:12px; }
+.match-detail.open{ display:block; }
+.sec-compare{ display:flex; gap:14px; }
+.sec-col{ flex:1; }
+.sec-col h4{ font-size:.72rem; text-align:center; margin-bottom:6px; color:var(--muted); }
+.sec-bar{ display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:.68rem; }
+.sec-bar .sbn{ width:62px; flex:none; color:#555; }
+.sec-bar .sbt{ flex:1; height:8px; border-radius:99px; background:#f1eef2; overflow:hidden; }
+.sec-bar .sbf{ height:100%; border-radius:99px; }
+
+/* おすすめタブ */
+#foryou-select{ margin-bottom:10px; }
+.me-card{ background:#fff7fb; border:1px solid #f0d9e6; border-radius:12px; padding:12px 14px; margin-top:4px; }
+.me-card .me-nm{ font-weight:800; }
+.foryou-pick{
+  display:flex; align-items:center; gap:12px; background:#fff; border-radius:14px; padding:13px 14px;
+  margin-bottom:10px; box-shadow:0 3px 10px rgba(0,0,0,.05); border-left:5px solid var(--pink);
+}
+.foryou-pick .fp-score{ font-size:1.5rem; font-weight:900; flex:none; width:60px; text-align:center; }
+.foryou-pick .fp-info{ flex:1; min-width:0; }
+.foryou-pick .fp-nm{ font-weight:800; }
+.foryou-pick .fp-sub{ font-size:.74rem; color:var(--muted); margin-top:2px; }
+.foryou-pick .fp-rank{ font-size:.7rem; font-weight:800; color:#b45309; }
+
 .rank-badge{ position:absolute; top:10px; right:12px; font-size:.7rem; font-weight:800; color:#b45309; background:#fef3c7; padding:3px 9px; border-radius:99px; }
 .toast{
   position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
@@ -145,7 +177,8 @@ input:focus, select:focus{ outline:none; border-color:var(--pink); }
 <div class="tabs">
   <button class="tab-btn active" data-tab="register">✍️ 登録</button>
   <button class="tab-btn" data-tab="people">👥 参加者</button>
-  <button class="tab-btn" data-tab="matches">💘 マッチ結果</button>
+  <button class="tab-btn" data-tab="matches">💘 ランキング</button>
+  <button class="tab-btn" data-tab="foryou">💌 おすすめ</button>
 </div>
 
 <div class="main">
@@ -203,6 +236,18 @@ input:focus, select:focus{ outline:none; border-color:var(--pink); }
     </div>
   </section>
 
+  <!-- ============ おすすめ ============ -->
+  <section class="view" id="view-foryou">
+    <div class="card">
+      <h2>💌 あなたへのおすすめ</h2>
+      <p class="hint">自分を選ぶと、異性の中から相性の良い順におすすめ相手を表示します。</p>
+      <label class="field">あなたは誰？</label>
+      <select id="foryou-select"></select>
+      <div id="foryou-me"></div>
+    </div>
+    <div id="foryou-list"></div>
+  </section>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -215,13 +260,42 @@ let selectedGender = null;
 
 /* 人気銘柄プリセット（ティッカー: セクター） */
 const PRESETS = {
+  // ハイテク・グロース
   'AAPL':'tech','MSFT':'tech','GOOGL':'tech','NVDA':'tech','META':'tech','AMZN':'tech','TSLA':'tech',
-  '7203':'auto','6758':'tech','9984':'tech','8306':'finance','SPY':'index','VTI':'index','QQQ':'index',
-  'JPM':'finance','KO':'dividend','JNJ':'dividend','VYM':'dividend','BTC':'crypto','ETH':'crypto'
+  'AMD':'tech','NFLX':'tech','PLTR':'tech','6758':'tech','9984':'tech','6861':'tech',
+  // 自動車
+  '7203':'auto','7267':'auto','GM':'auto','F':'auto',
+  // 金融
+  'JPM':'finance','BAC':'finance','GS':'finance','8306':'finance','8316':'finance','V':'finance','MA':'finance',
+  // 高配当・ディフェンシブ
+  'KO':'dividend','JNJ':'dividend','PG':'dividend','PEP':'dividend','VYM':'dividend','HDV':'dividend','2914':'dividend',
+  // ヘルスケア
+  'PFE':'health','MRNA':'health','LLY':'health','UNH':'health',
+  // エネルギー
+  'XOM':'energy','CVX':'energy','5020':'energy',
+  // 消費・小売
+  'MCD':'consumer','NKE':'consumer','SBUX':'consumer','9983':'consumer','7974':'consumer',
+  // REIT
+  'O':'reit','SPG':'reit','8951':'reit',
+  // インデックス
+  'SPY':'index','VTI':'index','QQQ':'index','VOO':'index','VT':'index','1306':'index','2558':'index',
+  // 暗号資産
+  'BTC':'crypto','ETH':'crypto','SOL':'crypto','XRP':'crypto'
 };
 const SECTOR_LABEL = {
-  tech:'ハイテク', auto:'自動車', finance:'金融', index:'インデックス',
-  dividend:'高配当', crypto:'暗号資産', other:'その他'
+  tech:'ハイテク', auto:'自動車', finance:'金融', dividend:'高配当',
+  health:'ヘルスケア', energy:'エネルギー', consumer:'消費', reit:'不動産',
+  index:'インデックス', crypto:'暗号資産', other:'その他'
+};
+const SECTOR_COLOR = {
+  tech:'#3b82f6', auto:'#6366f1', finance:'#10b981', dividend:'#f59e0b',
+  health:'#ef4444', energy:'#d97706', consumer:'#ec4899', reit:'#8b5cf6',
+  index:'#64748b', crypto:'#f97316', other:'#9ca3af'
+};
+/* セクター別リスク係数（0=超守り 〜 1=超攻め） */
+const SECTOR_RISK = {
+  crypto:1.0, tech:0.8, auto:0.55, energy:0.55, consumer:0.45,
+  finance:0.45, health:0.4, reit:0.35, dividend:0.2, index:0.3, other:0.5
 };
 
 /* ===================== ユーティリティ ===================== */
@@ -251,6 +325,19 @@ function sectorMix(holdings){
   for(const t in v){ const sec=sectorOf(t); s[sec]=(s[sec]||0)+v[t]; }
   return s;
 }
+/* リスク度（0-100）。攻め度合いを表す */
+function riskScore(holdings){
+  const v=normalize(holdings); let r=0;
+  for(const t in v) r+=v[t]*(SECTOR_RISK[sectorOf(t)] ?? 0.5);
+  // 集中度（保有が少ないほどリスク上昇）
+  const n=Object.keys(v).length;
+  const concentration = n>0 ? 1/n : 1; // 1銘柄=1.0, 多銘柄→0
+  r = r*0.8 + concentration*0.2;
+  return Math.round(Math.max(0,Math.min(1,r))*100);
+}
+function riskLabel(score){
+  return score>=70?'積極型（攻め）':score>=50?'やや積極型':score>=30?'バランス型':'安定型（守り）';
+}
 /* 投資スタイルのラベルを推定 */
 function styleTags(holdings){
   const s=sectorMix(holdings); const tags=[];
@@ -261,6 +348,7 @@ function styleTags(holdings){
   else if(tickers.length>0 && tickers.length<=2) tags.push('集中投資派');
   if((s.crypto||0)>0.25 || (s.tech||0)>0.6) tags.push('攻めのグロース');
   if((s.dividend||0)>0.3 || (s.index||0)>0.4) tags.push('堅実インカム');
+  if((s.health||0)+(s.consumer||0)+(s.reit||0)>0.4) tags.push('ディフェンシブ志向');
   return tags;
 }
 /* コサイン類似度（銘柄レベル） */
@@ -294,6 +382,12 @@ function compatibility(p1,p2){
   }
   score=Math.max(2,Math.min(99,Math.round(score)));
 
+  // リスク補完性：攻めと守りの差が大きいと「バランス◎」で微加点
+  const r1=riskScore(p1.holdings), r2=riskScore(p2.holdings);
+  const riskGap=Math.abs(r1-r2);
+  if(riskGap>=45) score+=3;
+  score=Math.max(2,Math.min(99,Math.round(score)));
+
   // 理由タグ
   const reasons=[];
   if(shared.length) reasons.push('共通銘柄 '+shared.length+'件');
@@ -302,18 +396,19 @@ function compatibility(p1,p2){
   const t1=p1.holdings.length, t2=p2.holdings.length;
   if(Math.abs(t1-t2)<=1) reasons.push('ポートフォリオの組み方が同じタイプ');
   if(p1.age&&p2.age&&Math.abs(p1.age-p2.age)<=3) reasons.push('年齢が近い');
-  // 補完性：片方が攻め・片方が守りだと「バランス◎」
-  const aggr=x=>(sectorMix(x.holdings).crypto||0)+(sectorMix(x.holdings).tech||0);
-  if(Math.abs(aggr(p1)-aggr(p2))>0.5) reasons.push('攻めと守りでバランス補完');
+  if(riskGap>=45) reasons.push('攻めと守りでバランス補完');
+  else if(riskGap<=12) reasons.push('リスク許容度が似ている');
   if(!reasons.length) reasons.push('これから価値観をすり合わせるタイプ');
 
-  return { score, shared:shared.slice(0,5), reasons };
+  return { score, shared:shared.slice(0,5), reasons, r1, r2, s1, s2 };
 }
 
 /* ===================== 登録フォーム ===================== */
 function renderPresets(){
   const box=document.getElementById('presets'); box.innerHTML='';
-  Object.keys(PRESETS).slice(0,12).forEach(t=>{
+  // 各セクターから代表銘柄をピックして偏りなく提示
+  const pick=['AAPL','NVDA','TSLA','7203','JPM','V','KO','VYM','LLY','XOM','MCD','O','SPY','VTI','BTC','ETH'];
+  pick.forEach(t=>{
     const c=document.createElement('div'); c.className='preset-chip'; c.textContent=t;
     c.onclick=()=>addHolding(t,''); box.appendChild(c);
   });
@@ -392,17 +487,67 @@ function renderPeople(){
   list.innerHTML='';
   people.forEach(p=>{
     const top=Object.entries(normalize(p.holdings)).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]).join(', ');
+    const rk=riskScore(p.holdings);
     const el=document.createElement('div'); el.className='person '+p.gender;
     el.innerHTML=`
       <div class="avatar ${p.gender}">${p.gender==='male'?'♂':'♀'}</div>
       <div class="info">
         <div class="nm">${esc(p.name)} ${p.age?'<span style="font-weight:400;color:#999;font-size:.8rem;">'+p.age+'歳</span>':''}</div>
-        <div class="sub">📊 ${esc(top||'—')} ・ ${styleTags(p.holdings).map(t=>'#'+t).join(' ')}</div>
+        <div class="sub">📊 ${esc(top||'—')} ・ 🎯${riskLabel(rk)} ・ ${styleTags(p.holdings).map(t=>'#'+t).join(' ')}</div>
       </div>
       <button class="del-p" title="削除">🗑</button>`;
     el.querySelector('.del-p').onclick=()=>{ people=people.filter(x=>x.id!==p.id); save(); renderPeople(); toast('削除しました'); };
     list.appendChild(el);
   });
+}
+
+/* ===================== 共通描画ヘルパー ===================== */
+function riskMeterHTML(label,score){
+  return `<div class="risk-row"><span class="rl">${esc(label.split('（')[0])}</span>
+    <div class="risk-track"><div class="risk-dot" style="left:${score}%"></div></div>
+    <span style="width:30px;text-align:right">${score}</span></div>`;
+}
+/* セクター比較バー（2人分） */
+function sectorBarsHTML(s1,name1,s2,name2){
+  const secs=[...new Set([...Object.keys(s1),...Object.keys(s2)])]
+    .sort((a,b)=>((s2[b]||0)+(s1[b]||0))-((s2[a]||0)+(s1[a]||0)));
+  const col=(s,nm)=>`<div class="sec-col"><h4>${esc(nm)}</h4>`+
+    secs.map(sec=>{
+      const v=Math.round((s[sec]||0)*100);
+      return `<div class="sec-bar"><span class="sbn">${SECTOR_LABEL[sec]}</span>
+        <span class="sbt"><span class="sbf" style="width:${v}%;background:${SECTOR_COLOR[sec]}"></span></span>
+        <span style="width:30px;text-align:right">${v}%</span></div>`;
+    }).join('')+`</div>`;
+  return `<div class="sec-compare">${col(s1,name1)}${col(s2,name2)}</div>`;
+}
+/* マッチカードのHTMLを生成（rank: 表示用バッジHTMLまたは''） */
+function matchCardHTML(pr,rankBadge){
+  const sharedHtml=pr.shared.length?'<div class="shared">🤝 共通銘柄：<b>'+pr.shared.map(esc).join(', ')+'</b></div>':'';
+  return `
+    ${rankBadge||''}
+    <div class="match-head">
+      <div class="match-person"><div class="mp-av avatar male">♂</div><div class="mp-nm">${esc(pr.m.name)}</div></div>
+      <div class="heart">${pr.score>=70?'💖':pr.score>=45?'💗':'🩶'}</div>
+      <div class="match-person"><div class="mp-av avatar female">♀</div><div class="mp-nm">${esc(pr.f.name)}</div></div>
+    </div>
+    <div class="score-ring">
+      <div class="score-num" style="color:${scoreColor(pr.score)}">${pr.score}<span style="font-size:1rem">%</span></div>
+      <div class="score-label">PORTFOLIO MATCH</div>
+    </div>
+    <div class="score-bar-wrap"><div class="score-bar" style="width:${pr.score}%"></div></div>
+    <div class="match-reasons">${pr.reasons.map(r=>'<span class="tag">'+esc(r)+'</span>').join('')}</div>
+    ${sharedHtml}
+    <div class="detail-toggle">▼ 詳しく見る（リスク・セクター比較）</div>
+    <div class="match-detail">
+      ${riskMeterHTML(esc(pr.m.name)+'：'+riskLabel(pr.r1),pr.r1)}
+      ${riskMeterHTML(esc(pr.f.name)+'：'+riskLabel(pr.r2),pr.r2)}
+      <div style="margin-top:12px">${sectorBarsHTML(pr.s1,pr.m.name,pr.s2,pr.f.name)}</div>
+    </div>`;
+}
+function bindDetailToggle(card){
+  const t=card.querySelector('.detail-toggle'), d=card.querySelector('.match-detail');
+  if(!t) return;
+  t.onclick=()=>{ const open=d.classList.toggle('open'); t.textContent=(open?'▲ 閉じる':'▼ 詳しく見る（リスク・セクター比較）'); };
 }
 
 /* ===================== マッチ結果 ===================== */
@@ -421,25 +566,60 @@ function renderMatches(){
   pairs.forEach((pr,i)=>{
     const card=document.createElement('div'); card.className='match-card';
     const rank=i===0?'<div class="rank-badge">👑 ベストカップル</div>':(i<3?'<div class="rank-badge">★ TOP'+(i+1)+'</div>':'');
-    const sharedHtml=pr.shared.length?'<div class="shared">🤝 共通銘柄：<b>'+pr.shared.map(esc).join(', ')+'</b></div>':'';
-    card.innerHTML=`
-      ${rank}
-      <div class="match-head">
-        <div class="match-person"><div class="mp-av avatar male">♂</div><div class="mp-nm">${esc(pr.m.name)}</div></div>
-        <div class="heart">${pr.score>=70?'💖':pr.score>=45?'💗':'🩶'}</div>
-        <div class="match-person"><div class="mp-av avatar female">♀</div><div class="mp-nm">${esc(pr.f.name)}</div></div>
-      </div>
-      <div class="score-ring">
-        <div class="score-num" style="color:${scoreColor(pr.score)}">${pr.score}<span style="font-size:1rem">%</span></div>
-        <div class="score-label">PORTFOLIO MATCH</div>
-      </div>
-      <div class="score-bar-wrap"><div class="score-bar" style="width:${pr.score}%"></div></div>
-      <div class="match-reasons">${pr.reasons.map(r=>'<span class="tag">'+esc(r)+'</span>').join('')}</div>
-      ${sharedHtml}`;
+    card.innerHTML=matchCardHTML(pr,rank);
+    bindDetailToggle(card);
     list.appendChild(card);
   });
 }
 function scoreColor(s){ return s>=70?'#e63973':s>=45?'#f97316':'#9ca3af'; }
+
+/* ===================== おすすめ（For You） ===================== */
+function renderForYou(){
+  const sel=document.getElementById('foryou-select');
+  const me=document.getElementById('foryou-me');
+  const list=document.getElementById('foryou-list');
+  if(people.length<2){
+    sel.innerHTML=''; me.innerHTML='';
+    list.innerHTML='<div class="empty">2人以上登録するとおすすめが表示されます。</div>';
+    return;
+  }
+  // セレクト構築（選択を保持）
+  const prev=sel.value;
+  sel.innerHTML=people.map(p=>`<option value="${p.id}">${esc(p.name)}（${p.gender==='male'?'男性':'女性'}）</option>`).join('');
+  if(people.some(p=>p.id===prev)) sel.value=prev;
+  drawForYou();
+}
+function drawForYou(){
+  const sel=document.getElementById('foryou-select');
+  const meBox=document.getElementById('foryou-me');
+  const list=document.getElementById('foryou-list');
+  const meId=sel.value;
+  const me=people.find(p=>p.id===meId);
+  if(!me){ meBox.innerHTML=''; list.innerHTML=''; return; }
+  const rk=riskScore(me.holdings);
+  meBox.innerHTML=`<div class="me-card">
+    <div class="me-nm">${esc(me.name)} ${me.age?'<span style="font-weight:400;color:#999">'+me.age+'歳</span>':''}</div>
+    <div style="font-size:.76rem;color:var(--muted);margin-top:3px">🎯 ${riskLabel(rk)} ・ ${styleTags(me.holdings).map(t=>'#'+t).join(' ')}</div>
+  </div>`;
+  const targets=people.filter(p=>p.gender!==me.gender);
+  if(targets.length===0){
+    list.innerHTML='<div class="empty">'+(me.gender==='male'?'女性':'男性')+'の参加者がまだいません。</div>';
+    return;
+  }
+  const ranked=targets.map(t=>{
+    const m=me.gender==='male'?me:t, f=me.gender==='male'?t:me;
+    return { other:t, ...compatibility(m,f), m, f };
+  }).sort((a,b)=>b.score-a.score);
+  list.innerHTML='';
+  ranked.forEach((pr,i)=>{
+    const card=document.createElement('div'); card.className='match-card';
+    const rank=i===0?'<div class="rank-badge">💝 イチオシ</div>':(i<3?'<div class="rank-badge">★ TOP'+(i+1)+'</div>':'');
+    card.innerHTML=matchCardHTML(pr,rank);
+    bindDetailToggle(card);
+    list.appendChild(card);
+  });
+}
+document.getElementById('foryou-select').onchange=drawForYou;
 
 /* ===================== タブ ===================== */
 function switchTab(name){
@@ -448,6 +628,7 @@ function switchTab(name){
   document.getElementById('view-'+name).classList.add('active');
   if(name==='people') renderPeople();
   if(name==='matches') renderMatches();
+  if(name==='foryou') renderForYou();
 }
 document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
